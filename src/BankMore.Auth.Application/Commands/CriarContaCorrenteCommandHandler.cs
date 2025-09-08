@@ -1,8 +1,6 @@
 ﻿using BankMore.Auth.Domain.Entities;
 using BankMore.Auth.Domain.Repositories;
 using MediatR;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BankMore.Auth.Application.Commands
 {
@@ -21,10 +19,9 @@ namespace BankMore.Auth.Application.Commands
                 throw new ArgumentException("Número da conta já existe.");
 
             var salt = Guid.NewGuid().ToString("N");
-            var senhaHash = HashSenha(request.Senha, salt);
+            var senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha + salt, BCrypt.Net.BCrypt.GenerateSalt());
 
-            var conta = new ContaCorrente(
-                Guid.NewGuid(),
+            var conta = ContaCorrente.Criar(
                 request.Numero,
                 request.Nome,
                 senhaHash,
@@ -33,13 +30,6 @@ namespace BankMore.Auth.Application.Commands
 
             await _repository.AdicionarAsync(conta);
             return conta.Id;
-        }
-
-        private string HashSenha(string senha, string salt)
-        {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(senha + salt));
-            return Convert.ToBase64String(hash);
         }
     }
 }

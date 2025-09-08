@@ -14,11 +14,11 @@ namespace BankMore.Auth.Infrastructure.Repositories
             _connection = connection;
         }
 
-        public async Task AdicionarAsync(Domain.Entities.ContaCorrente conta)
+        public async Task AdicionarAsync(ContaCorrente conta)
         {
             var sql = @"INSERT INTO contacorrente 
-                        (idcontacorrente, numero, nome, ativo, senha, salt)
-                        VALUES (@Id, @Numero, @Nome, @Ativo, @Senha, @Salt)";
+                        (idcontacorrente, numero, nome, ativo, senha, salt, saldo, criadoEm)
+                        VALUES (@Id, @Numero, @Nome, @Ativo, @Senha, @Salt, @Saldo, @CriadoEm)";
 
             await _connection.ExecuteAsync(sql, new
             {
@@ -27,7 +27,9 @@ namespace BankMore.Auth.Infrastructure.Repositories
                 conta.Nome,
                 Ativo = conta.Ativo ? 1 : 0,
                 conta.Senha,
-                conta.Salt
+                conta.Salt,
+                conta.Saldo,
+                conta.CriadoEm
             });
         }
 
@@ -38,23 +40,57 @@ namespace BankMore.Auth.Infrastructure.Repositories
             return count > 0;
         }
 
-        public async Task<Domain.Entities.ContaCorrente?> ObterPorIdAsync(Guid id)
+        public async Task<ContaCorrente?> ObterPorIdAsync(Guid id)
         {
-            var sql = @"SELECT * FROM contacorrente WHERE idcontacorrente = @Id";
-            return await _connection.QueryFirstOrDefaultAsync<Domain.Entities.ContaCorrente>(sql, new { Id = id });
+            var sql = @"SELECT idcontacorrente as Id, numero as Numero, nome as Nome, 
+                               ativo as Ativo, senha as Senha, salt as Salt, 
+                               saldo as Saldo, criadoEm as CriadoEm, 
+                               atualizadoEm as AtualizadoEm
+                        FROM contacorrente WHERE idcontacorrente = @Id";
+            
+            var contaDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Id = id });
+            
+            if (contaDto == null) return null;
+            
+            return new ContaCorrente(
+                contaDto.Id,
+                contaDto.Numero,
+                contaDto.Nome,
+                contaDto.Senha,
+                contaDto.Salt
+            );
         }
 
-        public async Task<Domain.Entities.ContaCorrente?> ObterPorNumeroAsync(int numero)
+        public async Task<ContaCorrente?> ObterPorNumeroAsync(int numero)
         {
-            var sql = @"SELECT * FROM contacorrente WHERE numero = @Numero";
-            return await _connection.QueryFirstOrDefaultAsync<Domain.Entities.ContaCorrente>(sql, new { Numero = numero });
+            var sql = @"SELECT idcontacorrente as Id, numero as Numero, nome as Nome, 
+                               ativo as Ativo, senha as Senha, salt as Salt, 
+                               saldo as Saldo, criadoEm as CriadoEm, 
+                               atualizadoEm as AtualizadoEm
+                        FROM contacorrente WHERE numero = @Numero";
+            
+            var contaDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Numero = numero });
+            
+            if (contaDto == null) return null;
+            
+            return new ContaCorrente(
+                contaDto.Id,
+                contaDto.Numero,
+                contaDto.Nome,
+                contaDto.Senha,
+                contaDto.Salt
+            );
         }
 
         public async Task AtualizarSaldoAsync(Guid idContaCorrente, decimal novoSaldo)
         {
-            // Aqui assumimos que existe uma coluna "saldo" (verifique isso no seu modelo e banco)
-            var sql = @"UPDATE contacorrente SET saldo = @Saldo WHERE idcontacorrente = @Id";
-            await _connection.ExecuteAsync(sql, new { Id = idContaCorrente, Saldo = novoSaldo });
+            var sql = @"UPDATE contacorrente SET saldo = @Saldo, atualizadoEm = @AtualizadoEm 
+                        WHERE idcontacorrente = @Id";
+            await _connection.ExecuteAsync(sql, new { 
+                Id = idContaCorrente, 
+                Saldo = novoSaldo, 
+                AtualizadoEm = DateTime.UtcNow 
+            });
         }
 
         public async Task<bool> ContaEstaAtivaAsync(Guid idContaCorrente)
@@ -66,32 +102,34 @@ namespace BankMore.Auth.Infrastructure.Repositories
 
         public async Task<decimal> ObterSaldoAsync(Guid idConta)
         {
-            var sql = @"
-        SELECT 
-            COALESCE(SUM(CASE 
-                WHEN tipomovimento = 'C' THEN valor 
-                WHEN tipomovimento = 'D' THEN -valor 
-                ELSE 0 END), 0)
-        FROM movimento
-        WHERE idcontacorrente = @id";
-
-            return await _connection.ExecuteScalarAsync<decimal>(sql, new { id = idConta });
+            var sql = @"SELECT saldo FROM contacorrente WHERE idcontacorrente = @Id";
+            var saldo = await _connection.ExecuteScalarAsync<decimal?>(sql, new { Id = idConta });
+            return saldo ?? 0;
         }
 
         public async Task AtualizarAsync(ContaCorrente conta)
         {
-            var sql = @"UPDATE contacorrente SET ativo = @Ativo WHERE idcontacorrente = @Id";
-            await _connection.ExecuteAsync(sql, new { Id = conta.Id, Ativo = conta.Ativo ? 1 : 0 });
+            var sql = @"UPDATE contacorrente 
+                        SET ativo = @Ativo, atualizadoEm = @AtualizadoEm 
+                        WHERE idcontacorrente = @Id";
+            await _connection.ExecuteAsync(sql, new { 
+                Id = conta.Id, 
+                Ativo = conta.Ativo ? 1 : 0,
+                AtualizadoEm = DateTime.UtcNow
+            });
         }
 
-        public Task AtualizarAsync(object conta)
+        public async Task<ContaCorrente?> ObterPorDocumentoOuNumeroAsync(string documentoOuNumero)
         {
-            throw new NotImplementedException();
-        }
-
-        public Task<ContaCorrente?> ObterPorDocumentoOuNumeroAsync(string documentoOuNumero)
-        {
-            throw new NotImplementedException();
+            // Tenta primeiro como número, depois como documento
+            if (int.TryParse(documentoOuNumero, out int numero))
+            {
+                return await ObterPorNumeroAsync(numero);
+            }
+            
+            // Se não for número, pode ser um documento (CPF, etc.)
+            // Por enquanto, retorna null - pode ser implementado conforme necessário
+            return null;
         }
     }
 }

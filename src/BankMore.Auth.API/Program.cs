@@ -1,8 +1,11 @@
 ﻿using BankMore.Auth.Application.Commands;
+using BankMore.Auth.Application.Behaviors;
 using BankMore.Auth.Domain.Abstractions;
 using BankMore.Auth.Domain.Repositories;
 using BankMore.Auth.Infrastructure.Persistence;
 using BankMore.Auth.Infrastructure.Repositories;
+using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
@@ -47,6 +50,13 @@ else
 
 builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(CriarUsuarioCommand).Assembly));
+
+// Configuração do FluentValidation
+builder.Services.AddValidatorsFromAssembly(typeof(CriarUsuarioCommand).Assembly);
+
+// Configuração dos comportamentos do MediatR
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers();
@@ -95,11 +105,57 @@ app.UseExceptionHandler(exceptionApp =>
         context.Response.ContentType = "application/json";
 
         var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-        var problem = exception is InvalidOperationException
-            ? new { Status = 400, Title = "Erro de validação", Detail = exception.Message }
-            : new { Status = 500, Title = "Erro interno", Detail = "Ocorreu um erro inesperado." };
+        
+        object problem;
+        
+        if (exception is ValidationException validationEx)
+        {
+            problem = new 
+            { 
+                Status = 400, 
+                Title = "Erro de validação", 
+                Detail = "Dados inválidos fornecidos",
+                Errors = validationEx.Errors.Select(e => new { Field = e.PropertyName, Message = e.ErrorMessage })
+            };
+        }
+        else if (exception is ArgumentException argEx)
+        {
+            problem = new 
+            { 
+                Status = 400, 
+                Title = "Erro de argumento", 
+                Detail = argEx.Message 
+            };
+        }
+        else if (exception is UnauthorizedAccessException)
+        {
+            problem = new 
+            { 
+                Status = 401, 
+                Title = "Não autorizado", 
+                Detail = exception.Message 
+            };
+        }
+        else if (exception is InvalidOperationException)
+        {
+            problem = new 
+            { 
+                Status = 400, 
+                Title = "Operação inválida", 
+                Detail = exception.Message 
+            };
+        }
+        else
+        {
+            problem = new 
+            { 
+                Status = 500, 
+                Title = "Erro interno", 
+                Detail = "Ocorreu um erro inesperado." 
+            };
+        }
 
-        context.Response.StatusCode = problem.Status;
+        context.Response.StatusCode = ((dynamic)problem).Status;
         await context.Response.WriteAsJsonAsync(problem);
     });
 });

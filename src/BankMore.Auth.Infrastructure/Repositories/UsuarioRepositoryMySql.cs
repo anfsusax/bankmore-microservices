@@ -1,6 +1,5 @@
 using BankMore.Auth.Domain.Entities;
 using BankMore.Auth.Domain.Repositories;
-using BankMore.Auth.Infrastructure.Mappers;
 using Dapper;
 using System.Data;
 
@@ -15,79 +14,94 @@ namespace BankMore.Auth.Infrastructure.Repositories
             _connection = connection;
         }
 
-        public async Task AdicionarAsync(ContaCorrente conta)
+        public async Task<Usuario?> ObterPorCpfAsync(string cpf)
         {
-            var sql = @"INSERT INTO contacorrente 
-                        (idcontacorrente, numero, nome, ativo, senha, salt)
-                        VALUES (@Id, @Numero, @Nome, @Ativo, @Senha, @Salt)";
+            var sql = @"SELECT id, nome, cpf, email, senhaHash, ativo, criadoEm 
+                       FROM usuarios WHERE cpf = @Cpf AND ativo = 1";
+            
+            var usuarioDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Cpf = cpf });
+            
+            if (usuarioDto == null) return null;
+            
+            return new Usuario(
+                usuarioDto.id,
+                usuarioDto.nome,
+                new Domain.ValueObjects.CPF(usuarioDto.cpf),
+                new Domain.ValueObjects.Email(usuarioDto.email),
+                usuarioDto.senhaHash
+            );
+        }
+
+        public async Task<Usuario?> ObterPorEmailAsync(string email)
+        {
+            var sql = @"SELECT id, nome, cpf, email, senhaHash, ativo, criadoEm 
+                       FROM usuarios WHERE email = @Email AND ativo = 1";
+            
+            var usuarioDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Email = email });
+            
+            if (usuarioDto == null) return null;
+            
+            return new Usuario(
+                usuarioDto.id,
+                usuarioDto.nome,
+                new Domain.ValueObjects.CPF(usuarioDto.cpf),
+                new Domain.ValueObjects.Email(usuarioDto.email),
+                usuarioDto.senhaHash
+            );
+        }
+
+        public async Task<Usuario?> ObterPorIdAsync(Guid id)
+        {
+            var sql = @"SELECT id, nome, cpf, email, senhaHash, ativo, criadoEm 
+                       FROM usuarios WHERE id = @Id AND ativo = 1";
+            
+            var usuarioDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Id = id });
+            
+            if (usuarioDto == null) return null;
+            
+            return new Usuario(
+                usuarioDto.id,
+                usuarioDto.nome,
+                new Domain.ValueObjects.CPF(usuarioDto.cpf),
+                new Domain.ValueObjects.Email(usuarioDto.email),
+                usuarioDto.senhaHash
+            );
+        }
+
+        public async Task AdicionarAsync(Usuario usuario)
+        {
+            var sql = @"INSERT INTO usuarios 
+                        (id, nome, cpf, email, senhaHash, ativo, criadoEm)
+                        VALUES (@Id, @Nome, @Cpf, @Email, @SenhaHash, @Ativo, @CriadoEm)";
 
             await _connection.ExecuteAsync(sql, new
             {
-                Id = conta.Id,
-                conta.Numero,
-                conta.Nome,
-                Ativo = conta.Ativo ? 1 : 0,
-                conta.Senha,
-                conta.Salt
+                Id = usuario.Id,
+                usuario.Nome,
+                Cpf = usuario.Cpf.Numero,
+                Email = usuario.Email.Endereco,
+                SenhaHash = usuario.SenhaHash,
+                Ativo = usuario.Ativo ? 1 : 0,
+                CriadoEm = usuario.CriadoEm
             });
         }
 
-        public async Task<bool> NumeroExisteAsync(int numero)
+        public async Task AtualizarAsync(Usuario usuario)
         {
-            var sql = @"SELECT COUNT(*) FROM contacorrente WHERE numero = @Numero";
-            var count = await _connection.ExecuteScalarAsync<int>(sql, new { Numero = numero });
-            return count > 0;
-        }
+            var sql = @"UPDATE usuarios 
+                        SET nome = @Nome, cpf = @Cpf, email = @Email, 
+                            senhaHash = @SenhaHash, ativo = @Ativo
+                        WHERE id = @Id";
 
-        public async Task<ContaCorrente?> ObterPorIdAsync(Guid id)
-        {
-            var sql = @"SELECT * FROM contacorrente WHERE idcontacorrente = @Id";
-            return await _connection.QueryFirstOrDefaultAsync<ContaCorrente>(sql, new { Id = id });
-        }
-
-        public async Task<ContaCorrente?> ObterPorNumeroAsync(int numero)
-        {
-            var sql = @"SELECT * FROM contacorrente WHERE numero = @Numero";
-            return await _connection.QueryFirstOrDefaultAsync<ContaCorrente>(sql, new { Numero = numero });
-        }
-
-        public async Task AtualizarSaldoAsync(Guid idContaCorrente, decimal novoSaldo)
-        {
-            // Aqui assumimos que existe uma coluna "saldo" (verifique isso no seu modelo e banco)
-            var sql = @"UPDATE contacorrente SET saldo = @Saldo WHERE idcontacorrente = @Id";
-            await _connection.ExecuteAsync(sql, new { Id = idContaCorrente, Saldo = novoSaldo });
-        }
-
-        public async Task<bool> ContaAtivaAsync(Guid idContaCorrente)
-        {
-            var sql = @"SELECT ativo FROM contacorrente WHERE idcontacorrente = @Id";
-            var ativo = await _connection.ExecuteScalarAsync<int?>(sql, new { Id = idContaCorrente });
-            return ativo == 1;
-        }
-
-        public Task<Usuario?> ObterPorCpfAsync(string cpf)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<Usuario?> ObterPorEmailAsync(string email)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<Usuario?> IUsuarioRepository.ObterPorIdAsync(Guid id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task AdicionarAsync(Usuario usuario)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task AtualizarAsync(Usuario usuario)
-        {
-            throw new NotImplementedException();
+            await _connection.ExecuteAsync(sql, new
+            {
+                Id = usuario.Id,
+                usuario.Nome,
+                Cpf = usuario.Cpf.Numero,
+                Email = usuario.Email.Endereco,
+                SenhaHash = usuario.SenhaHash,
+                Ativo = usuario.Ativo ? 1 : 0
+            });
         }
     }
 }

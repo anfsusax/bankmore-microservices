@@ -52,14 +52,15 @@ namespace BankMore.Auth.Application.Commands
             if (request.NumeroConta.HasValue && request.Tipo == "D" && conta.Id != idContaLogada)
                 throw new InvalidOperationException("INVALID_TYPE");
 
-            var movimento = new Movimento(
-                Guid.NewGuid(),
-                conta.Id,
-                DateTime.UtcNow,
-                request.Tipo,
-                request.Valor,
-                request.ChaveIdempotencia
-            );
+            Movimento movimento;
+            if (request.Tipo == "C")
+            {
+                movimento = Movimento.CriarCredito(conta.Id, request.Valor, request.ChaveIdempotencia);
+            }
+            else
+            {
+                movimento = Movimento.CriarDebito(conta.Id, request.Valor, request.ChaveIdempotencia);
+            }
 
             await _movimentoRepo.AdicionarAsync(movimento);
             return Unit.Value;

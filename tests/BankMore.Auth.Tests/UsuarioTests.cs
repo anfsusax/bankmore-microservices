@@ -22,12 +22,12 @@ namespace BankMore.Auth.Tests.Domain
             usuario.Should().NotBeNull();
             usuario.Nome.Should().Be(nome);
             usuario.Cpf.Numero.Should().Be(cpf.Numero);
-            usuario.Email.Should().Be(email);
+            usuario.Email.Endereco.Should().Be(email);
             usuario.Ativo.Should().BeTrue();
             usuario.SenhaHash.Should().Be(senhaHash);
             usuario.CriadoEm.Should().BeBefore(DateTime.UtcNow.AddSeconds(1));
-             
         }
+
         [Theory]
         [InlineData(null)]
         [InlineData("")]
@@ -51,7 +51,7 @@ namespace BankMore.Auth.Tests.Domain
             Action act = () => Usuario.Criar("Nome", cpf, (Email)emailInvalido, "senha");
 
             act.Should().Throw<ArgumentException>()
-                .WithMessage("Email é obrigatório");
+                .WithMessage("*não pode ser vazio*");
         }
 
         [Theory]

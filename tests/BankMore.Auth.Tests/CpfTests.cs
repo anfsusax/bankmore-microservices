@@ -21,6 +21,14 @@ public class CpfTests
     public void Deve_Lancar_Excecao_Cpf_Invalido(string cpfInvalido)
     {
         Action acao = () => new CPF(cpfInvalido);
-        acao.Should().Throw<ArgumentException>().WithMessage("*inv�lido*");
+        
+        if (string.IsNullOrWhiteSpace(cpfInvalido))
+        {
+            acao.Should().Throw<ArgumentException>().WithMessage("*não pode ser vazio*");
+        }
+        else
+        {
+            acao.Should().Throw<ArgumentException>().WithMessage("*inválido*");
+        }
     }
 }

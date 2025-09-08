@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
   
 
@@ -13,10 +12,10 @@ namespace BankMore.Auth.Application.Commands
 {
     public class AutenticarUsuarioCommandHandler : IRequestHandler<AutenticarUsuarioCommand, string>
     {
-        private readonly IContaCorrenteRepository _repository;
+        private readonly IUsuarioRepository _repository;
         private readonly IConfiguration _config;
 
-        public AutenticarUsuarioCommandHandler(IContaCorrenteRepository repository, IConfiguration config)
+        public AutenticarUsuarioCommandHandler(IUsuarioRepository repository, IConfiguration config)
         {
             _repository = repository;
             _config = config;
@@ -24,12 +23,17 @@ namespace BankMore.Auth.Application.Commands
 
         public async Task<string> Handle(AutenticarUsuarioCommand request, CancellationToken cancellationToken)
         {
-            var conta = await _repository.ObterPorDocumentoOuNumeroAsync(request.DocumentoOuConta);
-            if (conta is null)
-                throw new UnauthorizedAccessException("Conta não encontrada");
+            // Tenta encontrar o usuário por CPF ou email
+            var usuario = await _repository.ObterPorCpfAsync(request.DocumentoOuConta) 
+                         ?? await _repository.ObterPorEmailAsync(request.DocumentoOuConta);
+            
+            if (usuario is null)
+                throw new UnauthorizedAccessException("Usuário não encontrado");
 
-            var hash = HashSenha(request.Senha, conta.Salt);
-            if (conta.Senha != hash)
+            if (!usuario.Ativo)
+                throw new UnauthorizedAccessException("Usuário inativo");
+
+            if (!BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
                 throw new UnauthorizedAccessException("Senha inválida");
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -40,9 +44,11 @@ namespace BankMore.Auth.Application.Commands
             {
                 Subject = new ClaimsIdentity(new[]
                 {
-                        new Claim("id", conta.Id.ToString()),
-                        new Claim("numero", conta.Numero.ToString())
-                    }),
+                    new Claim("id", usuario.Id.ToString()),
+                    new Claim("nome", usuario.Nome),
+                    new Claim("cpf", usuario.Cpf.Numero),
+                    new Claim("email", usuario.Email.Endereco)
+                }),
                 Expires = DateTime.UtcNow.AddMinutes(int.Parse(_config["JwtSettings:ExpiresInMinutes"])),  
                 Issuer = _config["JwtSettings:Issuer"],
                 Audience = _config["JwtSettings:Audience"],
@@ -51,13 +57,6 @@ namespace BankMore.Auth.Application.Commands
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
-        }
-
-        private string HashSenha(string senha, string salt)
-        {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(senha + salt));
-            return Convert.ToBase64String(hash);
         }
     }
 }

@@ -1,9 +1,6 @@
 ﻿using BankMore.Auth.Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Http;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BankMore.Auth.Application.Commands
 {
@@ -32,21 +29,14 @@ namespace BankMore.Auth.Application.Commands
             if (!conta.Ativo)
                 throw new ArgumentException("Conta já está inativa", "INACTIVE_ACCOUNT");
 
-            var hashInformado = HashSenha(request.Senha, conta.Salt);
-            if (hashInformado != conta.Senha)
+            var hashInformado = BCrypt.Net.BCrypt.HashPassword(request.Senha + conta.Salt);
+            if (!BCrypt.Net.BCrypt.Verify(request.Senha + conta.Salt, conta.Senha))
                 throw new ArgumentException("Senha incorreta", "INVALID_PASSWORD");
 
             conta.Inativar();
             await _repository.AtualizarAsync(conta);
 
             return Unit.Value;
-        }
-
-        private string HashSenha(string senha, string salt)
-        {
-            using var sha256 = SHA256.Create();
-            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(senha + salt));
-            return Convert.ToBase64String(hash);
         }
     }
 }
