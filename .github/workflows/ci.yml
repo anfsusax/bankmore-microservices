@@ -1,4 +1,4 @@
-name: CI - Build and Test
+name: CI - Build and Test BankMore
 
 on:
   push:
@@ -12,18 +12,18 @@ jobs:
 
     steps:
       - name: Checkout código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Configurar .NET
-        uses: actions/setup-dotnet@v4
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restaurar pacotes
-        run: dotnet restore src/BankMore.Auth.sln
+      - name: Restaurar dependências
+        run: dotnet restore BankMore.Auth.sln
 
       - name: Compilar solução
-        run: dotnet build src/BankMore.Auth.sln --no-restore -c Release
+        run: dotnet build BankMore.Auth.sln --no-restore --configuration Release
 
-      - name: Rodar testes automatizados
-        run: dotnet test src/BankMore.Auth.sln --no-build -c Release --verbosity normal
+      - name: Executar testes
+        run: dotnet test BankMore.Auth.sln --no-build --verbosity normal
