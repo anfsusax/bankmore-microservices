@@ -1,0 +1,29 @@
+name: CI - Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar pacotes
+        run: dotnet restore src/BankMore.Auth.sln
+
+      - name: Compilar solução
+        run: dotnet build src/BankMore.Auth.sln --no-restore -c Release
+
+      - name: Rodar testes automatizados
+        run: dotnet test src/BankMore.Auth.sln --no-build -c Release --verbosity normal
