@@ -56,8 +56,12 @@ namespace BankMore.Auth.Infrastructure.Repositories
                 contaDto.Id,
                 contaDto.Numero,
                 contaDto.Nome,
+                contaDto.Ativo == 1,
                 contaDto.Senha,
-                contaDto.Salt
+                contaDto.Salt,
+                contaDto.Saldo,
+                contaDto.CriadoEm,
+                contaDto.AtualizadoEm
             );
         }
 
@@ -77,8 +81,12 @@ namespace BankMore.Auth.Infrastructure.Repositories
                 contaDto.Id,
                 contaDto.Numero,
                 contaDto.Nome,
+                contaDto.Ativo == 1,
                 contaDto.Senha,
-                contaDto.Salt
+                contaDto.Salt,
+                contaDto.Saldo,
+                contaDto.CriadoEm,
+                contaDto.AtualizadoEm
             );
         }
 

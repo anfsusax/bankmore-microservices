@@ -12,16 +12,17 @@
         public DateTime CriadoEm { get; private set; }
         public DateTime? AtualizadoEm { get; private set; }
 
-        public ContaCorrente(Guid id, int numero, string nome, string senhaHash, string salt)
+        public ContaCorrente(Guid id, int numero, string nome, bool ativo, string senha, string salt, decimal saldo, DateTime criadoEm, DateTime? atualizadoEm)
         {
             Id = id;
             Numero = numero;
             Nome = nome;
-            Senha = senhaHash;
+            Ativo = ativo;
+            Senha = senha;
             Salt = salt;
-            Ativo = true;
-            Saldo = 0;
-            CriadoEm = DateTime.UtcNow;
+            Saldo = saldo;
+            CriadoEm = criadoEm;
+            AtualizadoEm = atualizadoEm;
         }
 
         public static ContaCorrente Criar(int numero, string nome, string senhaHash, string salt)
@@ -38,7 +39,7 @@
             if (string.IsNullOrWhiteSpace(salt))
                 throw new ArgumentException("Salt é obrigatório");
 
-            return new ContaCorrente(Guid.NewGuid(), numero, nome, senhaHash, salt);
+            return new ContaCorrente(Guid.NewGuid(), numero, nome, true, senhaHash, salt, 0, DateTime.UtcNow, null);
         }
 
         public void Desativar() 
