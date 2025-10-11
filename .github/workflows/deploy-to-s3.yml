@@ -27,16 +27,25 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
-    # 3️⃣ Build da aplicação (adapte conforme seu projeto)
+    # 3️⃣ Build da aplicação .NET
     - name: Build application
       run: |
-        echo "Construindo aplicação..."
-        # Exemplo .NET
-        # dotnet restore
-        # dotnet build -c Release
-        # dotnet publish -c Release -o ./build
+        echo "Construindo aplicação .NET..."
+        dotnet restore
+        dotnet build -c Release
+        dotnet publish -c Release -o ./build
 
-    # 4️⃣ Compactar build com timestamp para versionamento
+    # 4️⃣ Verificar se a pasta build existe
+    - name: Check build folder
+      run: |
+        if [ -d "./build" ]; then
+          echo "Pasta build existe!"
+        else
+          echo "ERRO: Pasta build não existe!"
+          exit 1
+        fi
+
+    # 5️⃣ Compactar build com timestamp para versionamento
     - name: Zip build with timestamp
       run: |
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
@@ -44,13 +53,13 @@ jobs:
         zip -r $BUILD_FILE ./build
         echo "BUILD_FILE=$BUILD_FILE" >> $GITHUB_ENV
 
-    # 5️⃣ Upload do build para o S3
+    # 6️⃣ Upload do build para o S3
     - name: Upload build to S3
       run: |
         echo "Enviando build para o S3..."
         aws s3 cp $BUILD_FILE s3://$BUCKET_NAME/
 
-    # 6️⃣ Upload de relatórios (exemplo: cobertura, logs)
+    # 7️⃣ Upload de relatórios (opcional)
     - name: Upload reports to S3
       run: |
         if [ -d "./reports" ]; then
@@ -59,7 +68,7 @@ jobs:
           echo "Nenhum relatório encontrado"
         fi
 
-    # 7️⃣ Limitar builds antigos
+    # 8️⃣ Limitar builds antigos
     - name: Cleanup old builds
       run: |
         echo "Verificando builds antigos..."
@@ -74,6 +83,6 @@ jobs:
           done
         fi
 
-    # 8️⃣ Listar arquivos no bucket (opcional)
+    # 9️⃣ Listar arquivos no bucket (opcional)
     - name: List files in S3 bucket
       run: aws s3 ls s3://$BUCKET_NAME/
