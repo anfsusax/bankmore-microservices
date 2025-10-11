@@ -8,7 +8,7 @@ namespace BankMore.Auth.Infrastructure.Persistence
     {
         public BankMoreDbContext CreateDbContext(string[] args)
         {
-            // Carrega a configuração do projeto API
+             
             var configuration = new ConfigurationBuilder()
                 .SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "../BankMore.Auth.API"))
                 .AddJsonFile("appsettings.json", optional: false)
