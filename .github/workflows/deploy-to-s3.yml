@@ -19,6 +19,7 @@ jobs:
       EB_APP_NAME: BankMoreAPI
       EB_ENV_NAME: BankMoreAPI-env
       AWS_REGION: us-east-1
+      STORAGE_BUCKET: bankmore-eb-storage-alex  # Bucket S3 existente para EB
 
     steps:
     # 1️⃣ Checkout do repositório
@@ -84,7 +85,7 @@ jobs:
           done
         fi
 
-    # 8️⃣ Deploy para Elastic Beanstalk
+    # 8️⃣ Deploy para Elastic Beanstalk usando bucket existente
     - name: Deploy to Elastic Beanstalk
       uses: einaregilsson/beanstalk-deploy@v22
       with:
@@ -95,6 +96,7 @@ jobs:
         environment_name: ${{ env.EB_ENV_NAME }}
         version_label: ${{ github.sha }}
         deployment_package: ${{ env.BUILD_FILE }}
+        existing_bucket_name: ${{ env.STORAGE_BUCKET }}
 
     # 9️⃣ Listar arquivos no S3 (opcional)
     - name: List files in S3 bucket
