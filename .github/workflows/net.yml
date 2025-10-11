@@ -1,0 +1,31 @@
+name: CI - Build and Test BankMore
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Instalar .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restaurar dependências
+        run: dotnet restore BankMore.Auth.sln
+
+      - name: Compilar solução
+        run: dotnet build BankMore.Auth.sln --no-restore --configuration Release
+
+      - name: Executar testes com xUnit
+        run: |
+          cd tests/BankMore.Auth.Tests
+          dotnet test --configuration Release --verbosity normal
