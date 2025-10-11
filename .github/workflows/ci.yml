@@ -25,5 +25,7 @@ jobs:
       - name: Compilar solução
         run: dotnet build BankMore.Auth.sln --no-restore --configuration Release
 
-      - name: Executar testes
-        run: dotnet test BankMore.Auth.sln --no-build --verbosity normal
+      - name: Executar testes com xUnit
+        run: |
+          cd tests/BankMore.Auth.Tests
+          dotnet test --configuration Release --verbosity normal
