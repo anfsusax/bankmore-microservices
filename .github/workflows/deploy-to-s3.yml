@@ -1,0 +1,79 @@
+name: Advanced Deploy to S3
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      BUCKET_NAME: bankmore-deploy-bucket-alex
+      MAX_BUILDS: 5  # Quantos builds manter no S3
+
+    steps:
+    # 1️⃣ Checkout do repositório
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # 2️⃣ Configurar AWS CLI
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+    # 3️⃣ Build da aplicação (adapte conforme seu projeto)
+    - name: Build application
+      run: |
+        echo "Construindo aplicação..."
+        # Exemplo .NET
+        # dotnet restore
+        # dotnet build -c Release
+        # dotnet publish -c Release -o ./build
+
+    # 4️⃣ Compactar build com timestamp para versionamento
+    - name: Zip build with timestamp
+      run: |
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        BUILD_FILE="build-$TIMESTAMP.zip"
+        zip -r $BUILD_FILE ./build
+        echo "BUILD_FILE=$BUILD_FILE" >> $GITHUB_ENV
+
+    # 5️⃣ Upload do build para o S3
+    - name: Upload build to S3
+      run: |
+        echo "Enviando build para o S3..."
+        aws s3 cp $BUILD_FILE s3://$BUCKET_NAME/
+
+    # 6️⃣ Upload de relatórios (exemplo: cobertura, logs)
+    - name: Upload reports to S3
+      run: |
+        if [ -d "./reports" ]; then
+          aws s3 sync ./reports/ s3://$BUCKET_NAME/reports/
+        else
+          echo "Nenhum relatório encontrado"
+        fi
+
+    # 7️⃣ Limitar builds antigos
+    - name: Cleanup old builds
+      run: |
+        echo "Verificando builds antigos..."
+        FILES=$(aws s3 ls s3://$BUCKET_NAME/ | awk '{print $4}' | grep build- | sort)
+        COUNT=$(echo "$FILES" | wc -l)
+        if [ $COUNT -gt $MAX_BUILDS ]; then
+          REMOVE_COUNT=$((COUNT-MAX_BUILDS))
+          FILES_TO_DELETE=$(echo "$FILES" | head -n $REMOVE_COUNT)
+          for f in $FILES_TO_DELETE; do
+            echo "Removendo build antigo: $f"
+            aws s3 rm s3://$BUCKET_NAME/$f
+          done
+        fi
+
+    # 8️⃣ Listar arquivos no bucket (opcional)
+    - name: List files in S3 bucket
+      run: aws s3 ls s3://$BUCKET_NAME/
