@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      BUCKET_NAME: bankmore-deploy-bucket-alex
       MAX_BUILDS: 5
       EB_APP_NAME: BankMoreAPI
       EB_ENV_NAME: BankMoreAPI-env
@@ -25,27 +24,16 @@ jobs:
     # 1️⃣ Checkout do repositório
     - name: Checkout repository
       uses: actions/checkout@v3
-      # Bíblia: Neemias conferiu os muros antes de reconstruir Jerusalém (Ne 2:17-18)
 
-    # 2️⃣ Configurar AWS CLI
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-      # Bíblia: Preparar os recursos antes do deploy é como José se preparar antes de ir ao Egito (Gn 41)
-
-    # 3️⃣ Build da API .NET
+    # 2️⃣ Build da API .NET
     - name: Build API
       run: |
         echo "Construindo API .NET..."
         dotnet restore BankMore.Auth.sln
         dotnet build -c Release BankMore.Auth.sln
         dotnet publish -c Release -o ./build
-      # Bíblia: Preparar a oferta com cuidado antes de levar ao altar
 
-    # 4️⃣ Checar se pasta build existe
+    # 3️⃣ Checar se pasta build existe
     - name: Check build folder
       run: |
         if [ -d "./build" ]; then
@@ -55,23 +43,28 @@ jobs:
           exit 1
         fi
 
-    # 5️⃣ Zip do build com timestamp
+    # 4️⃣ Zip do build com timestamp
     - name: Zip build with timestamp
       run: |
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
         BUILD_FILE="build-$TIMESTAMP.zip"
         zip -r $BUILD_FILE ./build
         echo "BUILD_FILE=$BUILD_FILE" >> $GITHUB_ENV
-      # Bíblia: Cada build tem seu timestamp, como registrar datas importantes
 
-    # 6️⃣ Upload do build para o S3
+    # 5️⃣ Upload do build para S3 (opcional, backup)
     - name: Upload build to S3
+      if: always()
+      env:
+        BUCKET_NAME: bankmore-deploy-bucket-alex
       run: |
-        echo "Enviando build para o S3..."
         aws s3 cp $BUILD_FILE s3://$BUCKET_NAME/
 
-    # 7️⃣ Limitar builds antigos no S3
+    # 6️⃣ Limitar builds antigos no S3 (opcional)
     - name: Cleanup old builds
+      if: always()
+      env:
+        BUCKET_NAME: bankmore-deploy-bucket-alex
+        MAX_BUILDS: ${{ env.MAX_BUILDS }}
       run: |
         FILES=$(aws s3 ls s3://$BUCKET_NAME/ | awk '{print $4}' | grep build- | sort)
         COUNT=$(echo "$FILES" | wc -l)
@@ -84,18 +77,20 @@ jobs:
           done
         fi
 
-    # 8️⃣ Deploy para Elastic Beanstalk
+    # 7️⃣ Deploy para Elastic Beanstalk
     - name: Deploy to Elastic Beanstalk
       uses: einaregilsson/beanstalk-deploy@v22
       with:
+        aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        region: ${{ env.AWS_REGION }}
         application_name: ${{ env.EB_APP_NAME }}
         environment_name: ${{ env.EB_ENV_NAME }}
         version_label: ${{ github.sha }}
-        region: ${{ env.AWS_REGION }}
-        bucket_name: ${{ env.BUCKET_NAME }}
-        bucket_key: ${{ env.BUILD_FILE }}
-      # Bíblia: Como os servos levaram a Arca da Aliança para o lugar certo (1 Sm 6)
+        deployment_package: ${{ env.BUILD_FILE }}
 
-    # 9️⃣ Listar arquivos no S3 (opcional)
+    # 8️⃣ Listar arquivos no S3 (opcional)
     - name: List files in S3 bucket
+      env:
+        BUCKET_NAME: bankmore-deploy-bucket-alex
       run: aws s3 ls s3://$BUCKET_NAME/
