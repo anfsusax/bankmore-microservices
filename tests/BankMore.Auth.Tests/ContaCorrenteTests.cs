@@ -1,7 +1,7 @@
 using BankMore.Auth.Domain.Entities;
 using FluentAssertions;
 
-namespace BankMore.Auth.Tests.Domain;
+namespace BankMore.Auth.Tests;
 
 public class ContaCorrenteTests
 {

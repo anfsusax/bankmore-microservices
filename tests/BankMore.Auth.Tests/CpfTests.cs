@@ -1,7 +1,7 @@
 using BankMore.Auth.Domain.ValueObjects;
 using FluentAssertions;
 
-namespace BankMore.Auth.Tests.Domain;
+namespace BankMore.Auth.Tests;
 
 public class CpfTests
 {
