@@ -1,0 +1,217 @@
+@page "/login"
+@rendermode InteractiveServer
+@inject UserSessionService Session
+@inject BankMoreApiClient ApiClient
+@inject NavigationManager Navigation
+
+<div class="row justify-content-center py-4">
+    <div class="col-lg-6 col-md-8">
+        <div class="glass-card p-4 p-md-5">
+            <div class="text-center mb-4">
+                <div class="brand mb-2" style="font-size: 2rem; font-weight: 800;">
+                    <i class="fa-solid fa-building-columns" style="color: var(--primary-cyan);"></i>
+                    <span>Bank<span style="color: var(--primary-cyan);">More</span></span>
+                </div>
+                <p class="text-muted">Acesse sua conta digital ou cadastre-se em segundos</p>
+            </div>
+
+            <!-- TABS DE NAVEGAÇÃO -->
+            <div class="d-flex mb-4 bg-dark rounded-3 p-1">
+                <button class="btn w-50 py-2 font-weight-bold @(abaAtiva == "login" ? "btn-primary-bank" : "btn-secondary-bank border-0")" @onclick='() => AlternarAba("login")'>
+                    <i class="fa-solid fa-lock me-1"></i> Entrar
+                </button>
+                <button class="btn w-50 py-2 font-weight-bold @(abaAtiva == "cadastro" ? "btn-primary-bank" : "btn-secondary-bank border-0")" @onclick='() => AlternarAba("cadastro")'>
+                    <i class="fa-solid fa-user-plus me-1"></i> Criar Conta
+                </button>
+            </div>
+
+            <!-- MENSAGEM ALERTA -->
+            @if (!string.IsNullOrEmpty(mensagemAlert))
+            {
+                <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") mb-4" role="alert">
+                    <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
+                </div>
+            }
+
+            @if (abaAtiva == "login")
+            {
+                <!-- FORMULÁRIO DE LOGIN -->
+                <EditForm Model="loginModel" OnValidSubmit="ExecutarLogin">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">CPF ou Número da Conta</label>
+                        <InputText @bind-Value="loginModel.DocumentoOuConta" class="form-input" placeholder="Ex: 12345678909 ou 5001" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted small">Senha</label>
+                        <InputText @bind-Value="loginModel.Senha" type="password" class="form-input" placeholder="••••••••" />
+                    </div>
+
+                    <button type="submit" class="btn-primary-bank w-100 justify-content-center py-3" disabled="@processando">
+                        @if (processando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Autenticando...</span>
+                        }
+                        else
+                        {
+                            <span>Entrar na Minha Conta</span>
+                        }
+                    </button>
+                </EditForm>
+            }
+            else
+            {
+                <!-- FORMULÁRIO DE CADASTRO -->
+                <EditForm Model="registerModel" OnValidSubmit="ExecutarCadastro">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Nome Completo</label>
+                        <InputText @bind-Value="registerModel.Nome" class="form-input" placeholder="Ex: Carlos Eduardo" />
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">CPF Válido</label>
+                            <InputText @bind-Value="registerModel.Cpf" class="form-input" placeholder="Ex: 12345678909" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small">Número da Conta</label>
+                            <InputNumber @bind-Value="registerModel.NumeroConta" class="form-input" placeholder="Ex: 5001" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">E-mail</label>
+                        <InputText @bind-Value="registerModel.Email" type="email" class="form-input" placeholder="seu@email.com" />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-muted small">Senha de Acesso</label>
+                        <InputText @bind-Value="registerModel.Senha" type="password" class="form-input" placeholder="••••••••" />
+                    </div>
+
+                    <button type="submit" class="btn-primary-bank w-100 justify-content-center py-3" disabled="@processando">
+                        @if (processando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Criando Conta...</span>
+                        }
+                        else
+                        {
+                            <span>Cadastrar e Abrir Conta</span>
+                        }
+                    </button>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string abaAtiva = "login";
+    private bool processando = false;
+    private string mensagemAlert = "";
+    private bool sucessoAlert = false;
+
+    private LoginModel loginModel = new();
+    private RegisterModel registerModel = new();
+
+    private void AlternarAba(string aba)
+    {
+        abaAtiva = aba;
+        mensagemAlert = "";
+    }
+
+    private async Task ExecutarLogin()
+    {
+        if (string.IsNullOrWhiteSpace(loginModel.DocumentoOuConta) || string.IsNullOrWhiteSpace(loginModel.Senha))
+        {
+            sucessoAlert = false;
+            mensagemAlert = "Preencha o CPF/Conta e a senha.";
+            return;
+        }
+
+        processando = true;
+        mensagemAlert = "";
+
+        var result = await ApiClient.LoginAsync(loginModel);
+        processando = false;
+
+        if (result.Sucesso && !string.IsNullOrEmpty(result.Dados))
+        {
+            // Se logar via número da conta ou CPF, configura a sessão
+            int.TryParse(loginModel.DocumentoOuConta, out int numConta);
+            if (numConta == 0) numConta = 5001;
+
+            Session.DefinirSessao(result.Dados, "Usuário BankMore", loginModel.DocumentoOuConta, numConta, Guid.NewGuid(), 0m);
+
+            sucessoAlert = true;
+            mensagemAlert = "Autenticado com sucesso! Redirecionando...";
+            await Task.Delay(800);
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            sucessoAlert = false;
+            mensagemAlert = result.Mensagem;
+        }
+    }
+
+    private async Task ExecutarCadastro()
+    {
+        if (string.IsNullOrWhiteSpace(registerModel.Nome) || string.IsNullOrWhiteSpace(registerModel.Cpf) || string.IsNullOrWhiteSpace(registerModel.Senha))
+        {
+            sucessoAlert = false;
+            mensagemAlert = "Preencha todos os campos obrigatórios.";
+            return;
+        }
+
+        processando = true;
+        mensagemAlert = "";
+
+        // 1. Cadastra Usuário
+        var regResult = await ApiClient.RegistrarUsuarioAsync(registerModel);
+
+        if (!regResult.Sucesso)
+        {
+            processando = false;
+            sucessoAlert = false;
+            mensagemAlert = regResult.Mensagem;
+            return;
+        }
+
+        // 2. Cria Conta Corrente
+        var contaResult = await ApiClient.CriarContaCorrenteAsync(new CriarContaModel
+        {
+            Nome = registerModel.Nome,
+            Numero = registerModel.NumeroConta,
+            Senha = registerModel.Senha
+        });
+
+        processando = false;
+
+        if (contaResult.Sucesso)
+        {
+            // 3. Fazer Login automático
+            var loginRes = await ApiClient.LoginAsync(new LoginModel
+            {
+                DocumentoOuConta = registerModel.Cpf,
+                Senha = registerModel.Senha
+            });
+
+            var token = loginRes.Sucesso ? (loginRes.Dados ?? "") : "";
+
+            Session.DefinirSessao(token, registerModel.Nome, registerModel.Cpf, registerModel.NumeroConta, contaResult.Dados, 0m);
+
+            sucessoAlert = true;
+            mensagemAlert = "Conta cadastrada com sucesso! Redirecionando para o Dashboard...";
+            await Task.Delay(1000);
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            sucessoAlert = false;
+            mensagemAlert = contaResult.Mensagem;
+        }
+    }
+}

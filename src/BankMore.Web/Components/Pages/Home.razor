@@ -1,0 +1,255 @@
+@page "/"
+@rendermode InteractiveServer
+@inject UserSessionService Session
+@inject BankMoreApiClient ApiClient
+@implements IDisposable
+
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold m-0" style="font-size: 1.8rem;">Olá, <span style="color: var(--primary-cyan);">@Session.Nome</span>! 👋</h2>
+            <p class="text-muted m-0">Bem-vindo ao seu painel bancário BankMore</p>
+        </div>
+
+        @if (!Session.IsAuthenticated)
+        {
+            <a href="login" class="btn-primary-bank text-decoration-none">
+                <i class="fa-solid fa-right-to-bracket"></i> Entrar / Cadastrar
+            </a>
+        }
+        else
+        {
+            <button @onclick="CarregarSaldoApi" class="btn-secondary-bank">
+                <i class="fa-solid fa-rotate"></i> Atualizar Saldo
+            </button>
+        }
+    </div>
+
+    <!-- CARTÃO BANCÁRIO DIGITAL -->
+    <div class="row mb-4">
+        <div class="col-lg-6 col-md-8">
+            <div class="bank-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="chip"></div>
+                    <span class="badge-credit" style="background: rgba(0, 242, 254, 0.15); color: var(--primary-cyan); border-color: rgba(0, 242, 254, 0.3);">
+                        <i class="fa-solid fa-shield-halved me-1"></i> Conta Ativa
+                    </span>
+                </div>
+
+                <small class="text-uppercase tracking-wider text-muted font-monospace">Saldo em Conta Corrente</small>
+
+                <div class="d-flex align-items-center justify-content-between mt-1 mb-4">
+                    <h1 class="fw-extrabold m-0" style="font-size: 2.4rem; letter-spacing: -1px;">
+                        @if (Session.EsconderSaldo)
+                        {
+                            <span>R$ ••••••••</span>
+                        }
+                        else
+                        {
+                            <span>@Session.Saldo.ToString("C2")</span>
+                        }
+                    </h1>
+                    <button class="btn btn-link text-light fs-5 p-0" @onclick="Session.AlternarVisibilidadeSaldo" title="Ocultar/Exibir Saldo">
+                        <i class="fa-solid @(Session.EsconderSaldo ? "fa-eye-slash" : "fa-eye")"></i>
+                    </button>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-end pt-2 border-top border-secondary border-opacity-25">
+                    <div>
+                        <small class="text-muted d-block" style="font-size: 0.75rem;">TITULAR DA CONTA</small>
+                        <span class="fw-semibold" style="font-size: 0.95rem;">@Session.Nome.ToUpper()</span>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted d-block" style="font-size: 0.75rem;">Nº DA CONTA</small>
+                        <span class="font-monospace fw-bold" style="font-size: 1rem; color: var(--primary-cyan);">@Session.NumeroConta</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 col-md-4 mt-3 mt-lg-0">
+            <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
+                <h5 class="fw-bold mb-3"><i class="fa-solid fa-bolt text-warning me-2"></i>Ações Rápidas</h5>
+
+                <div class="d-grid gap-2">
+                    <button class="btn-primary-bank justify-content-center" @onclick='() => AbrirModalMovimento("C")'>
+                        <i class="fa-solid fa-circle-plus"></i> Fazer Depósito (Crédito)
+                    </button>
+                    <button class="btn-secondary-bank text-center" @onclick='() => AbrirModalMovimento("D")'>
+                        <i class="fa-solid fa-circle-minus text-danger"></i> Realizar Saque (Débito)
+                    </button>
+                </div>
+
+                <div class="mt-3 text-center">
+                    <small class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> Protegido com controle de idempotência</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MENSAGEM DE FEEDBACK -->
+    @if (!string.IsNullOrEmpty(mensagemAlert))
+    {
+        <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") alert-dismissible fade show" role="alert">
+            <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
+            <button type="button" class="btn-close btn-close-white" @onclick='() => mensagemAlert = ""'></button>
+        </div>
+    }
+
+    <!-- FORMULÁRIO DE MOVIMENTAÇÃO (MODAL EMBUTIDO) -->
+    @if (exibirModal)
+    {
+        <div class="glass-card p-4 mb-4" style="border-color: var(--primary-cyan);">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0">
+                    <i class="fa-solid @(movimentoModel.Tipo == "C" ? "fa-arrow-down-long text-success" : "fa-arrow-up-long text-danger") me-2"></i>
+                    @(movimentoModel.Tipo == "C" ? "Depósito (Crédito)" : "Saque (Débito)")
+                </h5>
+                <button class="btn-close btn-close-white" @onclick="FecharModal"></button>
+            </div>
+
+            <EditForm Model="movimentoModel" OnValidSubmit="ExecutarMovimento">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Valor (R$)</label>
+                        <InputNumber @bind-Value="movimentoModel.Valor" class="form-input" placeholder="0.00" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted small">Número da Conta</label>
+                        <InputNumber @bind-Value="movimentoModel.NumeroConta" class="form-input" placeholder="Ex: 5001" />
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label text-muted small">Descrição (Opcional)</label>
+                        <InputText @bind-Value="movimentoModel.Descricao" class="form-input" placeholder="Ex: Depósito de teste via Blazor" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn-secondary-bank" @onclick="FecharModal">Cancelar</button>
+                    <button type="submit" class="btn-primary-bank" disabled="@processando">
+                        @if (processando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Processando...</span>
+                        }
+                        else
+                        {
+                            <span>Confirmar Operação</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    }
+
+    <!-- EXTRATO DE TRANSAÇÕES -->
+    <div class="glass-card p-4">
+        <h5 class="fw-bold mb-3"><i class="fa-solid fa-list-check me-2" style="color: var(--primary-cyan);"></i> Histórico Recente</h5>
+
+        @if (Session.Extrato.Count == 0)
+        {
+            <div class="text-center py-4 text-muted">
+                <i class="fa-solid fa-receipt fs-1 mb-2 opacity-50"></i>
+                <p class="m-0">Nenhuma movimentação realizada nesta sessão.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-dark table-hover bg-transparent align-middle m-0">
+                    <thead>
+                        <tr class="text-muted border-secondary">
+                            <th>Tipo</th>
+                            <th>Descrição</th>
+                            <th>Data</th>
+                            <th class="text-end">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Session.Extrato)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="@(item.Tipo == "C" ? "badge-credit" : "badge-debit")">
+                                        @(item.Tipo == "C" ? "+ Crédito" : "- Débito")
+                                    </span>
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(item.Descricao) ? "Movimentação Bancária" : item.Descricao)</td>
+                                <td class="text-muted small">@item.Data.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                                <td class="text-end fw-bold @(item.Tipo == "C" ? "text-success" : "text-danger")">
+                                    @(item.Tipo == "C" ? "+" : "-") @item.Valor.ToString("C2")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool exibirModal = false;
+    private bool processando = false;
+    private string mensagemAlert = "";
+    private bool sucessoAlert = false;
+    private MovimentoModel movimentoModel = new();
+
+    protected override void OnInitialized()
+    {
+        Session.OnStateChanged += StateHasChanged;
+        movimentoModel.NumeroConta = Session.NumeroConta;
+    }
+
+    private async Task CarregarSaldoApi()
+    {
+        if (Session.ContaId != Guid.Empty)
+        {
+            var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId);
+            Session.AtualizarSaldo(novoSaldo);
+        }
+    }
+
+    private void AbrirModalMovimento(string tipo)
+    {
+        movimentoModel = new MovimentoModel
+        {
+            Tipo = tipo,
+            Valor = 100m,
+            NumeroConta = Session.NumeroConta,
+            ChaveIdempotencia = Guid.NewGuid().ToString()
+        };
+        exibirModal = true;
+    }
+
+    private void FecharModal()
+    {
+        exibirModal = false;
+    }
+
+    private async Task ExecutarMovimento()
+    {
+        processando = true;
+        mensagemAlert = "";
+
+        var result = await ApiClient.MovimentarContaAsync(movimentoModel, Session.Token);
+
+        processando = false;
+        sucessoAlert = result.Sucesso;
+        mensagemAlert = result.Mensagem;
+
+        if (result.Sucesso)
+        {
+            Session.AdicionarMovimento(movimentoModel.Tipo, movimentoModel.Valor, movimentoModel.Descricao ?? "Operação no Blazor", movimentoModel.ChaveIdempotencia);
+            await CarregarSaldoApi();
+            FecharModal();
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.OnStateChanged -= StateHasChanged;
+    }
+}

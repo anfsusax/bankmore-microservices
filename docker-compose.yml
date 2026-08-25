@@ -1,17 +1,24 @@
 version: '3.8'
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: bankmore_mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: bankmore_postgres
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: MinhaSenha123
-      MYSQL_DATABASE: bankmoredb
+      POSTGRES_DB: bankmoredb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: MinhaSenha123
     ports:
-      - "3306:3306"
+      - "5433:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/create.sql:/docker-entrypoint-initdb.d/create.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bankmoredb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -40,11 +47,13 @@ services:
   bankmore.api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: src/BankMore.Auth.API/Dockerfile
     container_name: bankmore_api
     environment:
       - DOTNET_RUNNING_IN_CONTAINER=true
-      - ConnectionStrings__MySql=server=mysql;port=3306;database=bankmoredb;user=root;password=MinhaSenha123;
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__PostgreSql=Host=postgres;Port=5432;Database=bankmoredb;Username=postgres;Password=MinhaSenha123;
       - JwtSettings__SecretKey=minha-chave-super-secreta-para-bankmore-1234567890
       - JwtSettings__Issuer=BankMore.Issuer
       - JwtSettings__Audience=BankMore.Audience
@@ -53,8 +62,23 @@ services:
     ports:
       - "5000:80"
     depends_on:
-      - mysql
-      - kafka
+      postgres:
+        condition: service_healthy
+
+  bankmore.web:
+    build:
+      context: .
+      dockerfile: src/BankMore.Web/Dockerfile
+    container_name: bankmore_web
+    environment:
+      - DOTNET_RUNNING_IN_CONTAINER=true
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ApiBaseUrl=http://bankmore_api:80
+    ports:
+      - "5001:80"
+    depends_on:
+      - bankmore.api
 
 volumes:
-  mysql_data:
+  postgres_data:

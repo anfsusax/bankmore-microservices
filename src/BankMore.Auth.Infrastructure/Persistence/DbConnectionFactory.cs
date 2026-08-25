@@ -1,5 +1,5 @@
-﻿using BankMore.Auth.Domain.Abstractions;
-using MySql.Data.MySqlClient;
+using BankMore.Auth.Domain.Abstractions;
+using Npgsql;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Data;
@@ -21,8 +21,9 @@ namespace BankMore.Auth.Infrastructure.Persistence
         { 
             if (_isDocker)
             {
-                var connectionString = _configuration.GetConnectionString("MySql");
-                var connection = new MySqlConnection(connectionString);
+                var connectionString = _configuration.GetConnectionString("PostgreSql") 
+                                       ?? _configuration.GetConnectionString("MySql");
+                var connection = new NpgsqlConnection(connectionString);
                 connection.Open();
                 return connection;
             }

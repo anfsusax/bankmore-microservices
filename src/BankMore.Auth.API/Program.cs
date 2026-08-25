@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -10,6 +10,8 @@ using BankMore.Auth.Application.Behaviors;
 using BankMore.Auth.Domain.Repositories;
 using BankMore.Auth.Infrastructure.Persistence;
 using BankMore.Auth.Infrastructure.Repositories;
+
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +28,10 @@ var isDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")
 
 if (isDocker)
 {
-    var connectionString = builder.Configuration.GetConnectionString("MySql");
+    var connectionString = builder.Configuration.GetConnectionString("PostgreSql") 
+                           ?? builder.Configuration.GetConnectionString("MySql");
     builder.Services.AddDbContext<BankMoreDbContext>(options =>
-        options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+        options.UseNpgsql(connectionString));
 }
 else
 {
@@ -42,14 +45,12 @@ else
 // HttpContextAccessor necessário para alguns handlers
 builder.Services.AddHttpContextAccessor();
 
-// Repositório EF Core - Conta Corrente (migration já criada)
+// Repositórios EF Core (PostgreSQL / Dual Provider)
 builder.Services.AddScoped<IContaCorrenteRepository, ContaCorrenteRepositoryEfCore>();
-
-// Repositórios temporários (Stubs) - serão substituídos quando as migrations forem criadas
-builder.Services.AddScoped<IUsuarioRepository, UsuarioRepositoryStub>();
-builder.Services.AddScoped<IMovimentoRepository, MovimentoRepositoryStub>();
-builder.Services.AddScoped<ITransferenciaRepository, TransferenciaRepositoryStub>();
-builder.Services.AddScoped<IIdempotenciaRepository, IdempotenciaRepositoryStub>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepositoryEfCore>();
+builder.Services.AddScoped<IMovimentoRepository, MovimentoRepositoryEfCore>();
+builder.Services.AddScoped<ITransferenciaRepository, TransferenciaRepositoryEfCore>();
+builder.Services.AddScoped<IIdempotenciaRepository, IdempotenciaRepositoryEfCore>();
 #endregion // ===============================================================================================
 
 #region ⚙️ MediatR + FluentValidation // ====================================================================
@@ -87,7 +88,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 #region 🌐 Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "BankMore API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "Insira o token JWT neste formato: Bearer {seu_token}",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
 #endregion
 

@@ -1,0 +1,145 @@
+@page "/movimentacoes"
+@rendermode InteractiveServer
+@inject UserSessionService Session
+@inject BankMoreApiClient ApiClient
+@implements IDisposable
+
+<div class="container-fluid p-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold m-0" style="font-size: 1.8rem;"><i class="fa-solid fa-money-bill-transfer text-success me-2"></i> Movimentações Financeiras</h2>
+            <p class="text-muted m-0">Realize depósitos, saques e transferências na sua conta BankMore</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(mensagemAlert))
+    {
+        <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") mb-4" role="alert">
+            <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
+        </div>
+    }
+
+    <div class="row">
+        <!-- FORMULÁRIO DE OPERAÇÃO -->
+        <div class="col-lg-6 mb-4">
+            <div class="glass-card p-4">
+                <h5 class="fw-bold mb-3"><i class="fa-solid fa-cash-register me-2" style="color: var(--primary-cyan);"></i> Nova Operação</h5>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Tipo de Operação</label>
+                    <select class="form-input" @bind="tipoOperacao">
+                        <option value="C">📥 Depósito (Crédito +)</option>
+                        <option value="D">📤 Saque (Débito -)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Número da Conta Destino</label>
+                    <input type="number" class="form-input" @bind="numeroContaTarget" placeholder="Ex: 5001" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Valor da Operação (R$)</label>
+                    <input type="number" step="0.01" class="form-input" @bind="valorOperacao" placeholder="100.00" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-muted small">Descrição ou Observação</label>
+                    <input type="text" class="form-input" @bind="descricaoOperacao" placeholder="Ex: Depósito de salário" />
+                </div>
+
+                <button class="btn-primary-bank w-100 justify-content-center py-3" @onclick="ExecutarOperacao" disabled="@processando">
+                    @if (processando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        <span>Processando Operação...</span>
+                    }
+                    else
+                    {
+                        <i class="fa-solid fa-paper-plane me-1"></i>
+                        <span>Confirmar e Processar</span>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <!-- RESUMO DA CONTA & REGRAS DE NEGÓCIO -->
+        <div class="col-lg-6 mb-4">
+            <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-shield-cat me-2" style="color: var(--accent-purple);"></i> Regras de Idempotência & Segurança</h5>
+                    <ul class="list-unstyled text-muted small d-flex flex-column gap-2 mb-4">
+                        <li><i class="fa-solid fa-check text-success me-2"></i> **Créditos (C)**: Adicionam saldo à conta corrente especificada.</li>
+                        <li><i class="fa-solid fa-check text-success me-2"></i> **Débitos (D)**: Subtraem saldo e exigem autenticação do titular.</li>
+                        <li><i class="fa-solid fa-check text-success me-2"></i> **Idempotência**: Cada operação gera um UUID único prevenindo cobranças duplicadas.</li>
+                    </ul>
+                </div>
+
+                <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25">
+                    <small class="text-muted d-block mb-1">Saldo Atual Registrado</small>
+                    <h3 class="fw-bold text-success m-0">@Session.Saldo.ToString("C2")</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string tipoOperacao = "C";
+    private int numeroContaTarget = 5001;
+    private decimal valorOperacao = 100m;
+    private string descricaoOperacao = "";
+    private bool processando = false;
+    private string mensagemAlert = "";
+    private bool sucessoAlert = false;
+
+    protected override void OnInitialized()
+    {
+        Session.OnStateChanged += StateHasChanged;
+        numeroContaTarget = Session.NumeroConta;
+    }
+
+    private async Task ExecutarOperacao()
+    {
+        if (valorOperacao <= 0)
+        {
+            sucessoAlert = false;
+            mensagemAlert = "O valor deve ser maior que R$ 0,00.";
+            return;
+        }
+
+        processando = true;
+        mensagemAlert = "";
+
+        var model = new MovimentoModel
+        {
+            Tipo = tipoOperacao,
+            Valor = valorOperacao,
+            NumeroConta = numeroContaTarget,
+            Descricao = string.IsNullOrWhiteSpace(descricaoOperacao) ? (tipoOperacao == "C" ? "Depósito via Blazor" : "Saque via Blazor") : descricaoOperacao,
+            ChaveIdempotencia = Guid.NewGuid().ToString()
+        };
+
+        var result = await ApiClient.MovimentarContaAsync(model, Session.Token);
+
+        processando = false;
+        sucessoAlert = result.Sucesso;
+        mensagemAlert = result.Mensagem;
+
+        if (result.Sucesso)
+        {
+            Session.AdicionarMovimento(model.Tipo, model.Valor, model.Descricao, model.ChaveIdempotencia);
+
+            if (Session.ContaId != Guid.Empty)
+            {
+                var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId);
+                Session.AtualizarSaldo(novoSaldo);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.OnStateChanged -= StateHasChanged;
+    }
+}

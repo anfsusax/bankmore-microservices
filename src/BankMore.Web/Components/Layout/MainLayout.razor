@@ -1,0 +1,61 @@
+@inherits LayoutComponentBase
+@inject UserSessionService Session
+@implements IDisposable
+
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="brand mb-4 d-flex align-items-center gap-2" style="font-size: 1.4rem; font-weight: 800;">
+            <i class="fa-solid fa-building-columns" style="color: var(--primary-cyan);"></i>
+            <span>Bank<span style="color: var(--primary-cyan);">More</span></span>
+        </div>
+
+        <nav class="d-flex flex-column gap-2">
+            <NavLink class="btn-secondary-bank text-decoration-none d-flex align-items-center gap-2" href="" Match="NavLinkMatch.All">
+                <i class="fa-solid fa-chart-pie" style="color: var(--primary-cyan);"></i> Dashboard
+            </NavLink>
+
+            <NavLink class="btn-secondary-bank text-decoration-none d-flex align-items-center gap-2" href="movimentacoes">
+                <i class="fa-solid fa-money-bill-transfer" style="color: var(--accent-green);"></i> Movimentações
+            </NavLink>
+
+            <NavLink class="btn-secondary-bank text-decoration-none d-flex align-items-center gap-2" href="login">
+                <i class="fa-solid fa-user-lock" style="color: var(--primary-blue);"></i> Conta / Login
+            </NavLink>
+        </nav>
+
+        <div class="mt-auto pt-4 border-top border-secondary border-opacity-25">
+            @if (Session.IsAuthenticated)
+            {
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="fw-bold text-truncate" style="max-width: 130px;">@Session.Nome</div>
+                        <small class="text-muted">Conta: @Session.NumeroConta</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="Session.EncerrarSessao" title="Sair">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            }
+            else
+            {
+                <small class="text-muted d-block text-center">Modo Visitante</small>
+            }
+        </div>
+    </aside>
+
+    <main class="main-content">
+        @Body
+    </main>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Session.OnStateChanged += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Session.OnStateChanged -= StateHasChanged;
+    }
+}

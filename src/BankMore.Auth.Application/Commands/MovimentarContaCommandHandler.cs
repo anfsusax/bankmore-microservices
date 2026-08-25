@@ -1,4 +1,4 @@
-﻿using BankMore.Auth.Domain.Entities;
+using BankMore.Auth.Domain.Entities;
 using BankMore.Auth.Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -63,6 +63,10 @@ namespace BankMore.Auth.Application.Commands
             }
 
             await _movimentoRepo.AdicionarAsync(movimento);
+
+            var novoSaldo = await _movimentoRepo.CalcularSaldoAsync(conta.Id);
+            await _contaRepo.AtualizarSaldoAsync(conta.Id, novoSaldo);
+
             return Unit.Value;
         }
     }
