@@ -95,8 +95,15 @@
                 </div>
 
                 <div class="p-4 rounded-3" style="background-color: var(--primary-light); border: 1px solid #bfdbfe;">
-                    <small class="text-muted d-block mb-1 fw-semibold text-uppercase font-monospace" style="font-size: 0.75rem;">Saldo Atual Registrado</small>
-                    <h3 class="fw-bold text-success m-0" style="font-size: 2rem;">@Session.Saldo.ToString("C2")</h3>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <small class="text-muted fw-semibold text-uppercase font-monospace" style="font-size: 0.75rem;">Saldo Atual Registrado</small>
+                        <button class="btn btn-sm btn-link text-muted p-0" @onclick="Session.AlternarVisibilidadeSaldo" title="Ocultar/Exibir Saldo">
+                            <i class="fa-solid @(Session.EsconderSaldo ? "fa-eye-slash" : "fa-eye")"></i>
+                        </button>
+                    </div>
+                    <h3 class="fw-bold text-success m-0" style="font-size: 2rem;">
+                        @(Session.EsconderSaldo ? "R$ ••••••••" : Session.Saldo.ToString("C2"))
+                    </h3>
                 </div>
             </div>
         </div>
@@ -112,10 +119,17 @@
     private string mensagemAlert = "";
     private bool sucessoAlert = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Session.OnStateChanged += StateHasChanged;
         numeroContaTarget = Session.NumeroConta;
+        await CarregarSaldo();
+    }
+
+    private async Task CarregarSaldo()
+    {
+        var saldoAtual = await ApiClient.ObterSaldoAsync(Session.ContaId, Session.NumeroConta);
+        Session.AtualizarSaldo(saldoAtual);
     }
 
     private async Task ExecutarOperacao()
@@ -148,12 +162,7 @@
         if (result.Sucesso)
         {
             Session.AdicionarMovimento(model.Tipo, model.Valor, model.Descricao, model.ChaveIdempotencia);
-
-            if (Session.ContaId != Guid.Empty)
-            {
-                var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId);
-                Session.AtualizarSaldo(novoSaldo);
-            }
+            await CarregarSaldo();
         }
     }
 

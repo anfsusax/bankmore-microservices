@@ -150,17 +150,49 @@ namespace BankMore.Web.Services
             }
         }
 
-        public async Task<decimal> ObterSaldoAsync(Guid contaId)
+        public async Task<decimal> ObterSaldoAsync(Guid contaId, int? numeroConta = null)
         {
             try
             {
-                var response = await _httpClient.GetAsync($"/api/contacorrente/contas/{contaId}/saldo");
-                if (response.IsSuccessStatusCode)
+                if (contaId != Guid.Empty)
                 {
-                    var content = await response.Content.ReadAsStringAsync();
-                    if (decimal.TryParse(content.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var saldo))
+                    var response = await _httpClient.GetAsync($"/api/contacorrente/contas/{contaId}/saldo");
+                    if (response.IsSuccessStatusCode)
                     {
-                        return saldo;
+                        var content = await response.Content.ReadAsStringAsync();
+                        if (decimal.TryParse(content.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var saldo))
+                        {
+                            return saldo;
+                        }
+                    }
+                }
+
+                if (numeroConta.HasValue && numeroConta.Value > 0)
+                {
+                    return await ObterSaldoPorNumeroAsync(numeroConta.Value);
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+            return 0m;
+        }
+
+        public async Task<decimal> ObterSaldoPorNumeroAsync(int numeroConta)
+        {
+            try
+            {
+                if (numeroConta > 0)
+                {
+                    var response = await _httpClient.GetAsync($"/api/contacorrente/contas/numero/{numeroConta}/saldo");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        if (decimal.TryParse(content.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var saldo))
+                        {
+                            return saldo;
+                        }
                     }
                 }
             }

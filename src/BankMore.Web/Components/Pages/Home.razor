@@ -21,13 +21,14 @@
         }
         else
         {
-            <button @onclick="CarregarSaldoApi" class="btn-secondary-bank">
-                <i class="fa-solid fa-rotate text-primary"></i> Atualizar Saldo
+            <button @onclick="CarregarSaldoApi" class="btn-secondary-bank" disabled="@carregandoSaldo">
+                <i class="fa-solid fa-rotate text-primary @(carregandoSaldo ? "fa-spin" : "")"></i>
+                <span>@(carregandoSaldo ? "Atualizando..." : "Atualizar Saldo")</span>
             </button>
         }
     </div>
 
-    <!-- CARTÃO BANCÁRIO DIGITAL & AÇÕES RÁPIDAS -->
+    <!-- CARTÃO BANCÁRIO DIGITAL & RESUMO FINANCEIRO -->
     <div class="row g-4 mb-4">
         <div class="col-lg-7 col-md-12">
             <div class="bank-card">
@@ -38,7 +39,7 @@
                     </span>
                 </div>
 
-                <small class="text-uppercase tracking-wider text-muted font-monospace" style="letter-spacing: 0.08em;">Saldo em Conta Corrente</small>
+                <small class="text-uppercase tracking-wider text-muted font-monospace" style="letter-spacing: 0.08em;">Saldo Disponível em Conta</small>
 
                 <div class="d-flex align-items-center justify-content-between mt-1 mb-4">
                     <h1 class="fw-bold m-0" style="font-size: 2.6rem; letter-spacing: -1px;">
@@ -89,6 +90,51 @@
 
                 <div class="mt-4 pt-2 border-top text-center" style="border-color: var(--border-subtle) !important;">
                     <small class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> Protegido com chave de idempotência</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARDS DE METRICAS DE SALDO E MOVIMENTACOES -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 d-flex align-items-center justify-content-center" style="background-color: var(--primary-light); color: var(--primary-blue); width: 48px; height: 48px;">
+                    <i class="fa-solid fa-wallet fs-5"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block fw-semibold" style="font-size: 0.8rem;">SALDO ATUAL</small>
+                    <div class="fw-bold fs-5" style="color: var(--text-main);">
+                        @(Session.EsconderSaldo ? "R$ ••••••" : Session.Saldo.ToString("C2"))
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 d-flex align-items-center justify-content-center" style="background-color: var(--accent-green-light); color: var(--accent-green-dark); width: 48px; height: 48px;">
+                    <i class="fa-solid fa-arrow-down fs-5"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block fw-semibold" style="font-size: 0.8rem;">TOTAL ENTRADAS</small>
+                    <div class="fw-bold fs-5 text-success">
+                        @(Session.EsconderSaldo ? "R$ ••••••" : Session.Extrato.Where(m => m.Tipo == "C").Sum(m => m.Valor).ToString("C2"))
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="glass-card p-3 d-flex align-items-center gap-3">
+                <div class="rounded-3 p-3 d-flex align-items-center justify-content-center" style="background-color: #fee2e2; color: #dc2626; width: 48px; height: 48px;">
+                    <i class="fa-solid fa-arrow-up fs-5"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block fw-semibold" style="font-size: 0.8rem;">TOTAL SAÍDAS</small>
+                    <div class="fw-bold fs-5 text-danger">
+                        @(Session.EsconderSaldo ? "R$ ••••••" : Session.Extrato.Where(m => m.Tipo == "D").Sum(m => m.Valor).ToString("C2"))
+                    </div>
                 </div>
             </div>
         </div>
@@ -214,22 +260,31 @@
 @code {
     private bool exibirModal = false;
     private bool processando = false;
+    private bool carregandoSaldo = false;
     private string mensagemAlert = "";
     private bool sucessoAlert = false;
     private MovimentoModel movimentoModel = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Session.OnStateChanged += StateHasChanged;
         movimentoModel.NumeroConta = Session.NumeroConta;
+        await CarregarSaldoApi();
     }
 
     private async Task CarregarSaldoApi()
     {
-        if (Session.ContaId != Guid.Empty)
+        carregandoSaldo = true;
+        StateHasChanged();
+        try
         {
-            var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId);
+            var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId, Session.NumeroConta);
             Session.AtualizarSaldo(novoSaldo);
+        }
+        finally
+        {
+            carregandoSaldo = false;
+            StateHasChanged();
         }
     }
 
