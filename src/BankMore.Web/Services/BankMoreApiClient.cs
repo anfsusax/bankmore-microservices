@@ -63,7 +63,7 @@ namespace BankMore.Web.Services
             }
         }
 
-        public async Task<ApiResponse<string>> LoginAsync(LoginModel model)
+        public async Task<ApiResponse<LoginResponseData>> LoginAsync(LoginModel model)
         {
             try
             {
@@ -80,20 +80,56 @@ namespace BankMore.Web.Services
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(json);
-                    string token = "";
-                    if (doc.RootElement.TryGetProperty("token", out var t) || doc.RootElement.TryGetProperty("Token", out t))
-                        token = t.GetString() ?? string.Empty;
+                    
+                    var loginData = new LoginResponseData();
 
-                    return new ApiResponse<string>
+                    if (doc.RootElement.TryGetProperty("token", out var t) || doc.RootElement.TryGetProperty("Token", out t))
+                        loginData.Token = t.GetString() ?? string.Empty;
+
+                    if (doc.RootElement.TryGetProperty("usuario", out var u) || doc.RootElement.TryGetProperty("Usuario", out u))
+                    {
+                        if (u.ValueKind == JsonValueKind.Object)
+                        {
+                            loginData.Usuario = new UsuarioInfoDto();
+                            if (u.TryGetProperty("id", out var uId) || u.TryGetProperty("Id", out uId))
+                                loginData.Usuario.Id = Guid.TryParse(uId.GetString(), out var g) ? g : Guid.Empty;
+                            if (u.TryGetProperty("nome", out var uNome) || u.TryGetProperty("Nome", out uNome))
+                                loginData.Usuario.Nome = uNome.GetString() ?? string.Empty;
+                            if (u.TryGetProperty("cpf", out var uCpf) || u.TryGetProperty("Cpf", out uCpf))
+                                loginData.Usuario.Cpf = uCpf.GetString() ?? string.Empty;
+                            if (u.TryGetProperty("email", out var uEmail) || u.TryGetProperty("Email", out uEmail))
+                                loginData.Usuario.Email = uEmail.GetString() ?? string.Empty;
+                        }
+                    }
+
+                    if (doc.RootElement.TryGetProperty("conta", out var c) || doc.RootElement.TryGetProperty("Conta", out c))
+                    {
+                        if (c.ValueKind == JsonValueKind.Object)
+                        {
+                            loginData.Conta = new ContaInfoDto();
+                            if (c.TryGetProperty("id", out var cId) || c.TryGetProperty("Id", out cId))
+                                loginData.Conta.Id = Guid.TryParse(cId.GetString(), out var cg) ? cg : Guid.Empty;
+                            if (c.TryGetProperty("numero", out var cNum) || c.TryGetProperty("Numero", out cNum))
+                                loginData.Conta.Numero = cNum.GetInt32();
+                            if (c.TryGetProperty("nome", out var cNome) || c.TryGetProperty("Nome", out cNome))
+                                loginData.Conta.Nome = cNome.GetString() ?? string.Empty;
+                            if (c.TryGetProperty("saldo", out var cSaldo) || c.TryGetProperty("Saldo", out cSaldo))
+                                loginData.Conta.Saldo = cSaldo.GetDecimal();
+                            if (c.TryGetProperty("ativo", out var cAtivo) || c.TryGetProperty("Ativo", out cAtivo))
+                                loginData.Conta.Ativo = cAtivo.GetBoolean();
+                        }
+                    }
+
+                    return new ApiResponse<LoginResponseData>
                     {
                         Sucesso = true,
                         Mensagem = "Login realizado com sucesso!",
-                        Dados = token
+                        Dados = loginData
                     };
                 }
 
                 var errorJson = await response.Content.ReadAsStringAsync();
-                return new ApiResponse<string>
+                return new ApiResponse<LoginResponseData>
                 {
                     Sucesso = false,
                     Mensagem = ExtractErrorMessage(errorJson, "Credenciais inválidas.")
@@ -101,7 +137,7 @@ namespace BankMore.Web.Services
             }
             catch (Exception ex)
             {
-                return new ApiResponse<string> { Sucesso = false, Mensagem = ex.Message };
+                return new ApiResponse<LoginResponseData> { Sucesso = false, Mensagem = ex.Message };
             }
         }
 

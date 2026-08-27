@@ -140,17 +140,34 @@
         var result = await ApiClient.LoginAsync(loginModel);
         processando = false;
 
-        if (result.Sucesso && !string.IsNullOrEmpty(result.Dados))
+        if (result.Sucesso && result.Dados != null)
         {
-            int.TryParse(loginModel.DocumentoOuConta, out int numConta);
-            if (numConta == 0) numConta = 5001;
+            var token = result.Dados.Token;
+            var nome = !string.IsNullOrWhiteSpace(result.Dados.Usuario?.Nome) 
+                ? result.Dados.Usuario.Nome 
+                : (!string.IsNullOrWhiteSpace(result.Dados.Conta?.Nome) ? result.Dados.Conta.Nome : "Usuário BankMore");
+            var cpf = !string.IsNullOrWhiteSpace(result.Dados.Usuario?.Cpf) 
+                ? result.Dados.Usuario.Cpf 
+                : loginModel.DocumentoOuConta;
+            var numConta = result.Dados.Conta?.Numero ?? 0;
+            var contaId = result.Dados.Conta?.Id ?? Guid.Empty;
+            var saldo = result.Dados.Conta?.Saldo ?? 0m;
 
-            var saldoInicial = await ApiClient.ObterSaldoPorNumeroAsync(numConta);
+            // Se o login foi feito por número de conta direto e não veio conta no objeto
+            if (numConta == 0 && int.TryParse(loginModel.DocumentoOuConta, out int parsedNum))
+            {
+                numConta = parsedNum;
+            }
 
-            Session.DefinirSessao(result.Dados, "Usuário BankMore", loginModel.DocumentoOuConta, numConta, Guid.Empty, saldoInicial);
+            if (saldo == 0m && numConta > 0)
+            {
+                saldo = await ApiClient.ObterSaldoPorNumeroAsync(numConta);
+            }
+
+            Session.DefinirSessao(token, nome, cpf, numConta, contaId, saldo);
 
             sucessoAlert = true;
-            mensagemAlert = "Autenticado com sucesso! Redirecionando...";
+            mensagemAlert = $"Bem-vindo, {nome}! Autenticado com sucesso. Redirecionando...";
             await Task.Delay(600);
             Navigation.NavigateTo("/");
         }
@@ -203,7 +220,7 @@
                 Senha = registerModel.Senha
             });
 
-            var token = loginRes.Sucesso ? (loginRes.Dados ?? "") : "";
+            var token = loginRes.Sucesso && loginRes.Dados != null ? loginRes.Dados.Token : "";
 
             Session.DefinirSessao(token, registerModel.Nome, registerModel.Cpf, registerModel.NumeroConta, contaResult.Dados, 0m);
 

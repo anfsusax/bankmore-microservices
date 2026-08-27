@@ -1,4 +1,4 @@
-﻿using BankMore.Auth.Domain.Entities;
+using BankMore.Auth.Domain.Entities;
 using BankMore.Auth.Domain.Repositories;
 using Dapper;
 using System.Data;
@@ -137,6 +137,29 @@ namespace BankMore.Auth.Infrastructure.Repositories
             // Se não for número, pode ser um documento (CPF, etc.)
             // Por enquanto, retorna null - pode ser implementado conforme necessário
             return null;
+        }
+
+        public async Task<ContaCorrente?> ObterPorNomeAsync(string nome)
+        {
+            var sql = @"SELECT TOP 1 idcontacorrente as Id, numero as Numero, nome as Nome, 
+                               ativo as Ativo, senha as Senha, salt as Salt, 
+                               saldo as Saldo, criadoEm as CriadoEm, 
+                               atualizadoEm as AtualizadoEm
+                        FROM contacorrente WHERE LOWER(nome) = LOWER(@Nome)";
+            
+            var contaDto = await _connection.QueryFirstOrDefaultAsync<dynamic>(sql, new { Nome = nome });
+            if (contaDto == null) return null;
+            return new ContaCorrente(
+                contaDto.Id,
+                contaDto.Numero,
+                contaDto.Nome,
+                contaDto.Ativo,
+                contaDto.Senha,
+                contaDto.Salt,
+                contaDto.Saldo,
+                contaDto.CriadoEm,
+                contaDto.AtualizadoEm
+            );
         }
     }
 }

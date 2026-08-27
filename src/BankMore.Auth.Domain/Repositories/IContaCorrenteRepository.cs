@@ -1,4 +1,4 @@
-﻿using BankMore.Auth.Domain.Entities;
+using BankMore.Auth.Domain.Entities;
 
 namespace BankMore.Auth.Domain.Repositories
 {
@@ -13,5 +13,6 @@ namespace BankMore.Auth.Domain.Repositories
         Task<decimal> ObterSaldoAsync(Guid idConta);
         Task AtualizarAsync(ContaCorrente conta);
         Task<ContaCorrente?> ObterPorDocumentoOuNumeroAsync(string documentoOuNumero);
+        Task<ContaCorrente?> ObterPorNomeAsync(string nome);
     }
 }

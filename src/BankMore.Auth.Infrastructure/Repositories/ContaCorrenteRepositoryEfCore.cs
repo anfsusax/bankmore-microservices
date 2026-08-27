@@ -81,6 +81,12 @@ namespace BankMore.Auth.Infrastructure.Repositories
             
             return null;
         }
+
+        public async Task<ContaCorrente?> ObterPorNomeAsync(string nome)
+        {
+            return await _context.ContasCorrente
+                .FirstOrDefaultAsync(c => c.Nome.ToLower() == nome.ToLower());
+        }
     }
 }
 

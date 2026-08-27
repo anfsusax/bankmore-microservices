@@ -50,6 +50,30 @@ namespace BankMore.Web.Models
         public string ChaveIdempotencia { get; set; } = string.Empty;
     }
 
+    public class LoginResponseData
+    {
+        public string Token { get; set; } = string.Empty;
+        public UsuarioInfoDto? Usuario { get; set; }
+        public ContaInfoDto? Conta { get; set; }
+    }
+
+    public class UsuarioInfoDto
+    {
+        public Guid Id { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public string Cpf { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ContaInfoDto
+    {
+        public Guid Id { get; set; }
+        public int Numero { get; set; }
+        public string Nome { get; set; } = string.Empty;
+        public decimal Saldo { get; set; }
+        public bool Ativo { get; set; }
+    }
+
     public class ApiResponse<T>
     {
         public bool Sucesso { get; set; }
