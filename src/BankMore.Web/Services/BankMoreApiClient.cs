@@ -38,7 +38,9 @@ namespace BankMore.Web.Services
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(json);
-                    var usuarioId = doc.RootElement.GetProperty("usuarioId").GetString() ?? string.Empty;
+                    string usuarioId = "";
+                    if (doc.RootElement.TryGetProperty("usuarioId", out var uId) || doc.RootElement.TryGetProperty("UsuarioId", out uId))
+                        usuarioId = uId.GetString() ?? string.Empty;
 
                     return new ApiResponse<string>
                     {
@@ -78,7 +80,9 @@ namespace BankMore.Web.Services
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(json);
-                    var token = doc.RootElement.GetProperty("token").GetString() ?? string.Empty;
+                    string token = "";
+                    if (doc.RootElement.TryGetProperty("token", out var t) || doc.RootElement.TryGetProperty("Token", out t))
+                        token = t.GetString() ?? string.Empty;
 
                     return new ApiResponse<string>
                     {
@@ -119,8 +123,11 @@ namespace BankMore.Web.Services
                 {
                     var json = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(json);
-                    var contaIdStr = doc.RootElement.GetProperty("id").GetString();
-                    var contaId = Guid.Parse(contaIdStr ?? Guid.NewGuid().ToString());
+                    string? contaIdStr = null;
+                    if (doc.RootElement.TryGetProperty("id", out var idProp) || doc.RootElement.TryGetProperty("Id", out idProp))
+                        contaIdStr = idProp.GetString();
+
+                    var contaId = Guid.TryParse(contaIdStr, out var parsedId) ? parsedId : Guid.NewGuid();
 
                     return new ApiResponse<Guid>
                     {
@@ -215,11 +222,49 @@ namespace BankMore.Web.Services
             try
             {
                 using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("detail", out var detail))
-                    return detail.GetString() ?? fallback;
+                var root = doc.RootElement;
 
-                if (doc.RootElement.TryGetProperty("title", out var title))
-                    return title.GetString() ?? fallback;
+                // 1. Procura por erros de validação (array de erros)
+                if (root.TryGetProperty("errors", out var errors) || root.TryGetProperty("Errors", out errors))
+                {
+                    if (errors.ValueKind == JsonValueKind.Array)
+                    {
+                        var messages = new List<string>();
+                        foreach (var err in errors.EnumerateArray())
+                        {
+                            if (err.TryGetProperty("message", out var msg) || err.TryGetProperty("Message", out msg))
+                            {
+                                var text = msg.GetString();
+                                if (!string.IsNullOrWhiteSpace(text))
+                                    messages.Add(text);
+                            }
+                        }
+                        if (messages.Count > 0)
+                            return string.Join("; ", messages);
+                    }
+                }
+
+                // 2. Procura propriedades de texto comuns (detail, message, title)
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.NameEquals("detail") || prop.NameEquals("Detail") ||
+                        prop.NameEquals("message") || prop.NameEquals("Message"))
+                    {
+                        var str = prop.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(str))
+                            return str;
+                    }
+                }
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.NameEquals("title") || prop.NameEquals("Title"))
+                    {
+                        var str = prop.Value.GetString();
+                        if (!string.IsNullOrWhiteSpace(str))
+                            return str;
+                    }
+                }
             }
             catch
             {

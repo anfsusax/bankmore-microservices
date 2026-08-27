@@ -26,6 +26,11 @@ ou qualquer coisa que impacte o futuro do projeto.
 
 ## Registro De Decisoes
 
+### 2026-08-25 — Reformulação Visual com Paleta Suave de Banco Real
+**Contexto:** o tema escuro anterior apresentava contraste excessivo e pouca aderência estética aos padrões de bancos digitais e corporativos reais do dia a dia.
+**Decisao:** remodelar todo o design system no `app.css` e componentes Blazor para utilizar superfícies claras em tons suaves (Slate/Soft Pearl `#f8fafc` e `#f1f5f9`), cartões brancos com sombras suaves, detalhes em Royal Blue (`#2563eb`), cartão digital azul-marinho com chip metálico e tabelas financeiras limpas.
+**Impacto:** a interface do BankMore agora oferece alta legibilidade, conforto visual e aparência idêntica a bancos digitais modernos (como Nubank, Inter, BTG e Revolut).
+
 ### 2026-08-24 — Criação da Interface Blazor Web App (BankMore.Web)
 
 **Contexto:** necessidade do usuário por uma interface de banco digital intuitiva, moderna e responsiva para operar contas, depósitos, saques e saldos.

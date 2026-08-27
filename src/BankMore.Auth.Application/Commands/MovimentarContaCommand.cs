@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 
 namespace BankMore.Auth.Application.Commands
 {
@@ -6,6 +6,7 @@ namespace BankMore.Auth.Application.Commands
          string Tipo, // "C" ou "D"
          decimal Valor,
          string ChaveIdempotencia,
-         int? NumeroConta = null
+         int? NumeroConta = null,
+         string? Descricao = null
      ) : IRequest<Unit>;
 }

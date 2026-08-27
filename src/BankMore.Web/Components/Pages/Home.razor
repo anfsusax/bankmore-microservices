@@ -7,7 +7,9 @@
 <div class="container-fluid p-0">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="fw-bold m-0" style="font-size: 1.8rem;">Olá, <span style="color: var(--primary-cyan);">@Session.Nome</span>! 👋</h2>
+            <h2 class="fw-bold m-0" style="font-size: 1.8rem; color: var(--text-main);">
+                Olá, <span style="color: var(--primary-blue);">@Session.Nome</span>! 👋
+            </h2>
             <p class="text-muted m-0">Bem-vindo ao seu painel bancário BankMore</p>
         </div>
 
@@ -20,26 +22,26 @@
         else
         {
             <button @onclick="CarregarSaldoApi" class="btn-secondary-bank">
-                <i class="fa-solid fa-rotate"></i> Atualizar Saldo
+                <i class="fa-solid fa-rotate text-primary"></i> Atualizar Saldo
             </button>
         }
     </div>
 
-    <!-- CARTÃO BANCÁRIO DIGITAL -->
-    <div class="row mb-4">
-        <div class="col-lg-6 col-md-8">
+    <!-- CARTÃO BANCÁRIO DIGITAL & AÇÕES RÁPIDAS -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7 col-md-12">
             <div class="bank-card">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="chip"></div>
-                    <span class="badge-credit" style="background: rgba(0, 242, 254, 0.15); color: var(--primary-cyan); border-color: rgba(0, 242, 254, 0.3);">
-                        <i class="fa-solid fa-shield-halved me-1"></i> Conta Ativa
+                    <span class="badge-info-bank" style="background: rgba(255, 255, 255, 0.2); color: #ffffff; border-color: rgba(255, 255, 255, 0.3);">
+                        <i class="fa-solid fa-shield-halved me-1 text-warning"></i> Conta Ativa
                     </span>
                 </div>
 
-                <small class="text-uppercase tracking-wider text-muted font-monospace">Saldo em Conta Corrente</small>
+                <small class="text-uppercase tracking-wider text-muted font-monospace" style="letter-spacing: 0.08em;">Saldo em Conta Corrente</small>
 
                 <div class="d-flex align-items-center justify-content-between mt-1 mb-4">
-                    <h1 class="fw-extrabold m-0" style="font-size: 2.4rem; letter-spacing: -1px;">
+                    <h1 class="fw-bold m-0" style="font-size: 2.6rem; letter-spacing: -1px;">
                         @if (Session.EsconderSaldo)
                         {
                             <span>R$ ••••••••</span>
@@ -49,39 +51,44 @@
                             <span>@Session.Saldo.ToString("C2")</span>
                         }
                     </h1>
-                    <button class="btn btn-link text-light fs-5 p-0" @onclick="Session.AlternarVisibilidadeSaldo" title="Ocultar/Exibir Saldo">
+                    <button class="btn btn-link text-white fs-5 p-0 opacity-75" @onclick="Session.AlternarVisibilidadeSaldo" title="Ocultar/Exibir Saldo">
                         <i class="fa-solid @(Session.EsconderSaldo ? "fa-eye-slash" : "fa-eye")"></i>
                     </button>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-end pt-2 border-top border-secondary border-opacity-25">
+                <div class="d-flex justify-content-between align-items-end pt-3 border-top" style="border-color: rgba(255, 255, 255, 0.2) !important;">
                     <div>
                         <small class="text-muted d-block" style="font-size: 0.75rem;">TITULAR DA CONTA</small>
-                        <span class="fw-semibold" style="font-size: 0.95rem;">@Session.Nome.ToUpper()</span>
+                        <span class="fw-semibold" style="font-size: 0.95rem; letter-spacing: 0.02em;">@Session.Nome.ToUpper()</span>
                     </div>
                     <div class="text-end">
                         <small class="text-muted d-block" style="font-size: 0.75rem;">Nº DA CONTA</small>
-                        <span class="font-monospace fw-bold" style="font-size: 1rem; color: var(--primary-cyan);">@Session.NumeroConta</span>
+                        <span class="font-monospace fw-bold" style="font-size: 1.1rem; color: #67e8f9;">@Session.NumeroConta</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-lg-6 col-md-4 mt-3 mt-lg-0">
+        <div class="col-lg-5 col-md-12">
             <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
-                <h5 class="fw-bold mb-3"><i class="fa-solid fa-bolt text-warning me-2"></i>Ações Rápidas</h5>
+                <div>
+                    <h5 class="fw-bold mb-3" style="color: var(--text-main);">
+                        <i class="fa-solid fa-bolt text-warning me-2"></i>Ações Rápidas
+                    </h5>
+                    <p class="text-muted small mb-4">Realize movimentações instantâneas na sua conta com validação automática de segurança.</p>
+                </div>
 
-                <div class="d-grid gap-2">
-                    <button class="btn-primary-bank justify-content-center" @onclick='() => AbrirModalMovimento("C")'>
+                <div class="d-grid gap-3">
+                    <button class="btn-primary-bank justify-content-center py-3" @onclick='() => AbrirModalMovimento("C")'>
                         <i class="fa-solid fa-circle-plus"></i> Fazer Depósito (Crédito)
                     </button>
-                    <button class="btn-secondary-bank text-center" @onclick='() => AbrirModalMovimento("D")'>
+                    <button class="btn-secondary-bank justify-content-center py-3" @onclick='() => AbrirModalMovimento("D")'>
                         <i class="fa-solid fa-circle-minus text-danger"></i> Realizar Saque (Débito)
                     </button>
                 </div>
 
-                <div class="mt-3 text-center">
-                    <small class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> Protegido com controle de idempotência</small>
+                <div class="mt-4 pt-2 border-top text-center" style="border-color: var(--border-subtle) !important;">
+                    <small class="text-muted"><i class="fa-solid fa-lock text-success me-1"></i> Protegido com chave de idempotência</small>
                 </div>
             </div>
         </div>
@@ -90,39 +97,42 @@
     <!-- MENSAGEM DE FEEDBACK -->
     @if (!string.IsNullOrEmpty(mensagemAlert))
     {
-        <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") alert-dismissible fade show" role="alert">
-            <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
-            <button type="button" class="btn-close btn-close-white" @onclick='() => mensagemAlert = ""'></button>
+        <div class="alert @(sucessoAlert ? "alert-bank-success" : "alert-bank-danger") alert-dismissible fade show p-3 mb-4 d-flex align-items-center justify-content-between" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") fs-5 me-2"></i>
+                <span class="fw-medium">@mensagemAlert</span>
+            </div>
+            <button type="button" class="btn-close" @onclick='() => mensagemAlert = ""'></button>
         </div>
     }
 
     <!-- FORMULÁRIO DE MOVIMENTAÇÃO (MODAL EMBUTIDO) -->
     @if (exibirModal)
     {
-        <div class="glass-card p-4 mb-4" style="border-color: var(--primary-cyan);">
+        <div class="glass-card p-4 mb-4 border-2" style="border-color: var(--primary-blue) !important; box-shadow: 0 12px 32px rgba(37, 99, 235, 0.12);">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold m-0">
+                <h5 class="fw-bold m-0" style="color: var(--text-main);">
                     <i class="fa-solid @(movimentoModel.Tipo == "C" ? "fa-arrow-down-long text-success" : "fa-arrow-up-long text-danger") me-2"></i>
-                    @(movimentoModel.Tipo == "C" ? "Depósito (Crédito)" : "Saque (Débito)")
+                    @(movimentoModel.Tipo == "C" ? "Novo Depósito (Crédito em Conta)" : "Novo Saque (Débito em Conta)")
                 </h5>
-                <button class="btn-close btn-close-white" @onclick="FecharModal"></button>
+                <button class="btn-close" @onclick="FecharModal"></button>
             </div>
 
             <EditForm Model="movimentoModel" OnValidSubmit="ExecutarMovimento">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label text-muted small">Valor (R$)</label>
+                        <label class="form-label text-muted small fw-semibold">Valor da Operação (R$)</label>
                         <InputNumber @bind-Value="movimentoModel.Valor" class="form-input" placeholder="0.00" />
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label text-muted small">Número da Conta</label>
+                        <label class="form-label text-muted small fw-semibold">Número da Conta Destino</label>
                         <InputNumber @bind-Value="movimentoModel.NumeroConta" class="form-input" placeholder="Ex: 5001" />
                     </div>
 
                     <div class="col-md-12">
-                        <label class="form-label text-muted small">Descrição (Opcional)</label>
-                        <InputText @bind-Value="movimentoModel.Descricao" class="form-input" placeholder="Ex: Depósito de teste via Blazor" />
+                        <label class="form-label text-muted small fw-semibold">Descrição / Identificação (Opcional)</label>
+                        <InputText @bind-Value="movimentoModel.Descricao" class="form-input" placeholder="Ex: Depósito de salário ou reserva de emergência" />
                     </div>
                 </div>
 
@@ -136,6 +146,7 @@
                         }
                         else
                         {
+                            <i class="fa-solid fa-check me-1"></i>
                             <span>Confirmar Operação</span>
                         }
                     </button>
@@ -146,24 +157,33 @@
 
     <!-- EXTRATO DE TRANSAÇÕES -->
     <div class="glass-card p-4">
-        <h5 class="fw-bold mb-3"><i class="fa-solid fa-list-check me-2" style="color: var(--primary-cyan);"></i> Histórico Recente</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0" style="color: var(--text-main);">
+                <i class="fa-solid fa-list-check me-2" style="color: var(--primary-blue);"></i> Histórico de Transações Recentes
+            </h5>
+            @if (Session.Extrato.Count > 0)
+            {
+                <span class="badge-info-bank">@Session.Extrato.Count registro(s)</span>
+            }
+        </div>
 
         @if (Session.Extrato.Count == 0)
         {
-            <div class="text-center py-4 text-muted">
-                <i class="fa-solid fa-receipt fs-1 mb-2 opacity-50"></i>
-                <p class="m-0">Nenhuma movimentação realizada nesta sessão.</p>
+            <div class="text-center py-5 text-muted">
+                <i class="fa-solid fa-receipt fs-1 mb-3 opacity-25"></i>
+                <p class="m-0 fw-medium">Nenhuma movimentação realizada nesta sessão.</p>
+                <small class="text-subtle">Faça um depósito ou saque através do painel acima para ver o extrato.</small>
             </div>
         }
         else
         {
             <div class="table-responsive">
-                <table class="table table-dark table-hover bg-transparent align-middle m-0">
+                <table class="bank-table">
                     <thead>
-                        <tr class="text-muted border-secondary">
+                        <tr>
                             <th>Tipo</th>
                             <th>Descrição</th>
-                            <th>Data</th>
+                            <th>Data / Horário</th>
                             <th class="text-end">Valor</th>
                         </tr>
                     </thead>
@@ -173,12 +193,13 @@
                             <tr>
                                 <td>
                                     <span class="@(item.Tipo == "C" ? "badge-credit" : "badge-debit")">
-                                        @(item.Tipo == "C" ? "+ Crédito" : "- Débito")
+                                        <i class="fa-solid @(item.Tipo == "C" ? "fa-arrow-down" : "fa-arrow-up") me-1"></i>
+                                        @(item.Tipo == "C" ? "Crédito" : "Débito")
                                     </span>
                                 </td>
-                                <td>@(string.IsNullOrWhiteSpace(item.Descricao) ? "Movimentação Bancária" : item.Descricao)</td>
+                                <td class="fw-medium">@(string.IsNullOrWhiteSpace(item.Descricao) ? "Movimentação Bancária" : item.Descricao)</td>
                                 <td class="text-muted small">@item.Data.ToString("dd/MM/yyyy HH:mm:ss")</td>
-                                <td class="text-end fw-bold @(item.Tipo == "C" ? "text-success" : "text-danger")">
+                                <td class="text-end fw-bold @(item.Tipo == "C" ? "text-success" : "text-danger")" style="font-size: 1rem;">
                                     @(item.Tipo == "C" ? "+" : "-") @item.Valor.ToString("C2")
                                 </td>
                             </tr>
@@ -253,3 +274,4 @@
         Session.OnStateChanged -= StateHasChanged;
     }
 }
+

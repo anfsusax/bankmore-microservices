@@ -7,26 +7,34 @@
 <div class="container-fluid p-0">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="fw-bold m-0" style="font-size: 1.8rem;"><i class="fa-solid fa-money-bill-transfer text-success me-2"></i> Movimentações Financeiras</h2>
-            <p class="text-muted m-0">Realize depósitos, saques e transferências na sua conta BankMore</p>
+            <h2 class="fw-bold m-0" style="font-size: 1.8rem; color: var(--text-main);">
+                <i class="fa-solid fa-money-bill-transfer text-success me-2"></i> Movimentações Financeiras
+            </h2>
+            <p class="text-muted m-0">Realize depósitos e saques na sua conta BankMore com segurança e liquidação imediata</p>
         </div>
     </div>
 
     @if (!string.IsNullOrEmpty(mensagemAlert))
     {
-        <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") mb-4" role="alert">
-            <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
+        <div class="alert @(sucessoAlert ? "alert-bank-success" : "alert-bank-danger") alert-dismissible fade show p-3 mb-4 d-flex align-items-center justify-content-between" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") fs-5 me-2"></i>
+                <span class="fw-medium">@mensagemAlert</span>
+            </div>
+            <button type="button" class="btn-close" @onclick='() => mensagemAlert = ""'></button>
         </div>
     }
 
-    <div class="row">
+    <div class="row g-4">
         <!-- FORMULÁRIO DE OPERAÇÃO -->
-        <div class="col-lg-6 mb-4">
-            <div class="glass-card p-4">
-                <h5 class="fw-bold mb-3"><i class="fa-solid fa-cash-register me-2" style="color: var(--primary-cyan);"></i> Nova Operação</h5>
+        <div class="col-lg-6">
+            <div class="glass-card p-4 h-100">
+                <h5 class="fw-bold mb-3" style="color: var(--text-main);">
+                    <i class="fa-solid fa-cash-register me-2" style="color: var(--primary-blue);"></i> Nova Operação
+                </h5>
 
                 <div class="mb-3">
-                    <label class="form-label text-muted small">Tipo de Operação</label>
+                    <label class="form-label text-muted small fw-semibold">Tipo de Operação</label>
                     <select class="form-input" @bind="tipoOperacao">
                         <option value="C">📥 Depósito (Crédito +)</option>
                         <option value="D">📤 Saque (Débito -)</option>
@@ -34,17 +42,17 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-muted small">Número da Conta Destino</label>
+                    <label class="form-label text-muted small fw-semibold">Número da Conta Destino</label>
                     <input type="number" class="form-input" @bind="numeroContaTarget" placeholder="Ex: 5001" />
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label text-muted small">Valor da Operação (R$)</label>
+                    <label class="form-label text-muted small fw-semibold">Valor da Operação (R$)</label>
                     <input type="number" step="0.01" class="form-input" @bind="valorOperacao" placeholder="100.00" />
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label text-muted small">Descrição ou Observação</label>
+                    <label class="form-label text-muted small fw-semibold">Descrição ou Observação (Opcional)</label>
                     <input type="text" class="form-input" @bind="descricaoOperacao" placeholder="Ex: Depósito de salário" />
                 </div>
 
@@ -64,20 +72,31 @@
         </div>
 
         <!-- RESUMO DA CONTA & REGRAS DE NEGÓCIO -->
-        <div class="col-lg-6 mb-4">
+        <div class="col-lg-6">
             <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
                 <div>
-                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-shield-cat me-2" style="color: var(--accent-purple);"></i> Regras de Idempotência & Segurança</h5>
-                    <ul class="list-unstyled text-muted small d-flex flex-column gap-2 mb-4">
-                        <li><i class="fa-solid fa-check text-success me-2"></i> **Créditos (C)**: Adicionam saldo à conta corrente especificada.</li>
-                        <li><i class="fa-solid fa-check text-success me-2"></i> **Débitos (D)**: Subtraem saldo e exigem autenticação do titular.</li>
-                        <li><i class="fa-solid fa-check text-success me-2"></i> **Idempotência**: Cada operação gera um UUID único prevenindo cobranças duplicadas.</li>
+                    <h5 class="fw-bold mb-3" style="color: var(--text-main);">
+                        <i class="fa-solid fa-shield-halved me-2" style="color: var(--primary-accent);"></i> Regras de Idempotência & Segurança
+                    </h5>
+                    <ul class="list-unstyled text-muted small d-flex flex-column gap-3 mb-4">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="fa-solid fa-circle-check text-success mt-1"></i>
+                            <div><strong>Créditos (C)</strong>: Adicionam saldo à conta corrente especificada imediatamente.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="fa-solid fa-circle-check text-success mt-1"></i>
+                            <div><strong>Débitos (D)</strong>: Subtraem saldo e exigem token ativo ou autorização da conta.</div>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="fa-solid fa-circle-check text-success mt-1"></i>
+                            <div><strong>Idempotência</strong>: Cada operação gera um UUID único prevenindo cobranças duplicadas em caso de retransmissão de rede.</div>
+                        </li>
                     </ul>
                 </div>
 
-                <div class="p-3 bg-dark rounded-3 border border-secondary border-opacity-25">
-                    <small class="text-muted d-block mb-1">Saldo Atual Registrado</small>
-                    <h3 class="fw-bold text-success m-0">@Session.Saldo.ToString("C2")</h3>
+                <div class="p-4 rounded-3" style="background-color: var(--primary-light); border: 1px solid #bfdbfe;">
+                    <small class="text-muted d-block mb-1 fw-semibold text-uppercase font-monospace" style="font-size: 0.75rem;">Saldo Atual Registrado</small>
+                    <h3 class="fw-bold text-success m-0" style="font-size: 2rem;">@Session.Saldo.ToString("C2")</h3>
                 </div>
             </div>
         </div>
@@ -143,3 +162,4 @@
         Session.OnStateChanged -= StateHasChanged;
     }
 }
+

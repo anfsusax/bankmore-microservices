@@ -18,6 +18,9 @@ var apiBaseUrl = builder.Configuration.GetValue<string>("ApiBaseUrl")
 builder.Services.AddHttpClient<BankMoreApiClient>(client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
 
 var app = builder.Build();

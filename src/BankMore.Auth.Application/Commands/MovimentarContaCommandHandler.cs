@@ -25,41 +25,47 @@ namespace BankMore.Auth.Application.Commands
         {
             var userId = _httpContextAccessor.HttpContext?.User?.FindFirst("id")?.Value;
             if (userId is null)
-                throw new UnauthorizedAccessException("TOKEN_INVALID");
-
-            var idContaLogada = Guid.Parse(userId);
+                throw new UnauthorizedAccessException("Usuário não autenticado ou token inválido.");
 
             var idempotenteExiste = await _movimentoRepo.ExisteIdempotenciaAsync(request.ChaveIdempotencia);
             if (idempotenteExiste)
-                return Unit.Value;  
+                return Unit.Value;
 
-            var conta = request.NumeroConta.HasValue
-                ? await _contaRepo.ObterPorNumeroAsync(request.NumeroConta.Value)
-                : await _contaRepo.ObterPorIdAsync(idContaLogada);
+            ContaCorrente? conta = null;
+            if (request.NumeroConta.HasValue)
+            {
+                conta = await _contaRepo.ObterPorNumeroAsync(request.NumeroConta.Value);
+            }
+            else if (Guid.TryParse(userId, out var idContaGuid))
+            {
+                conta = await _contaRepo.ObterPorIdAsync(idContaGuid);
+            }
 
             if (conta is null)
-                throw new InvalidOperationException("INVALID_ACCOUNT");
+                throw new InvalidOperationException(request.NumeroConta.HasValue 
+                    ? $"Conta corrente número {request.NumeroConta.Value} não encontrada." 
+                    : "Conta corrente não encontrada.");
 
             if (!conta.Ativo)
-                throw new InvalidOperationException("INACTIVE_ACCOUNT");
+                throw new InvalidOperationException("Conta corrente inativa.");
 
             if (request.Valor <= 0)
-                throw new InvalidOperationException("INVALID_VALUE");
+                throw new InvalidOperationException("O valor da operação deve ser maior que zero.");
 
             if (request.Tipo != "C" && request.Tipo != "D")
-                throw new InvalidOperationException("INVALID_TYPE");
+                throw new InvalidOperationException("Tipo de movimentação inválido. Utilize 'C' (Crédito) ou 'D' (Débito).");
 
-            if (request.NumeroConta.HasValue && request.Tipo == "D" && conta.Id != idContaLogada)
-                throw new InvalidOperationException("INVALID_TYPE");
+            if (request.Tipo == "D" && conta.Saldo < request.Valor)
+                throw new InvalidOperationException($"Saldo insuficiente para realizar o saque. Saldo atual: R$ {conta.Saldo:N2}, valor solicitado: R$ {request.Valor:N2}.");
 
             Movimento movimento;
             if (request.Tipo == "C")
             {
-                movimento = Movimento.CriarCredito(conta.Id, request.Valor, request.ChaveIdempotencia);
+                movimento = Movimento.CriarCredito(conta.Id, request.Valor, request.ChaveIdempotencia, request.Descricao ?? "Depósito");
             }
             else
             {
-                movimento = Movimento.CriarDebito(conta.Id, request.Valor, request.ChaveIdempotencia);
+                movimento = Movimento.CriarDebito(conta.Id, request.Valor, request.ChaveIdempotencia, request.Descricao ?? "Saque");
             }
 
             await _movimentoRepo.AdicionarAsync(movimento);

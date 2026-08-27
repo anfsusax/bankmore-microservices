@@ -31,6 +31,7 @@ Prioridades: [ALTA] | [MEDIA] | [BAIXA]
 
 ## Concluidas
 
+- [x] [ALTA] Modernizar o design frontend com paleta suave e identidade de banco real — 2026-08-25
 - [x] [ALTA] Criar projeto Blazor Web App em .NET 8 (BankMore.Web) com design bancário moderno — 2026-08-24
 - [x] [ALTA] Integrar Blazor com a API REST (Login, Cadastro, Depósito, Saque, Saldo) — 2026-08-24
 - [x] [ALTA] Adicionar container bankmore.web no docker-compose.yml na porta 5001 — 2026-08-24

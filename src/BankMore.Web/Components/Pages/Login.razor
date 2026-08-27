@@ -5,22 +5,22 @@
 @inject NavigationManager Navigation
 
 <div class="row justify-content-center py-4">
-    <div class="col-lg-6 col-md-8">
+    <div class="col-lg-5 col-md-8">
         <div class="glass-card p-4 p-md-5">
             <div class="text-center mb-4">
                 <div class="brand mb-2" style="font-size: 2rem; font-weight: 800;">
-                    <i class="fa-solid fa-building-columns" style="color: var(--primary-cyan);"></i>
-                    <span>Bank<span style="color: var(--primary-cyan);">More</span></span>
+                    <i class="fa-solid fa-building-columns brand-icon"></i>
+                    <span>Bank<span style="color: var(--primary-blue);">More</span></span>
                 </div>
                 <p class="text-muted">Acesse sua conta digital ou cadastre-se em segundos</p>
             </div>
 
             <!-- TABS DE NAVEGAÇÃO -->
-            <div class="d-flex mb-4 bg-dark rounded-3 p-1">
-                <button class="btn w-50 py-2 font-weight-bold @(abaAtiva == "login" ? "btn-primary-bank" : "btn-secondary-bank border-0")" @onclick='() => AlternarAba("login")'>
+            <div class="d-flex mb-4 p-1 rounded-3" style="background-color: var(--bg-body); border: 1px solid var(--border-card);">
+                <button class="btn w-50 py-2 fw-semibold @(abaAtiva == "login" ? "btn-primary-bank" : "btn-secondary-bank border-0 bg-transparent text-muted")" @onclick='() => AlternarAba("login")'>
                     <i class="fa-solid fa-lock me-1"></i> Entrar
                 </button>
-                <button class="btn w-50 py-2 font-weight-bold @(abaAtiva == "cadastro" ? "btn-primary-bank" : "btn-secondary-bank border-0")" @onclick='() => AlternarAba("cadastro")'>
+                <button class="btn w-50 py-2 fw-semibold @(abaAtiva == "cadastro" ? "btn-primary-bank" : "btn-secondary-bank border-0 bg-transparent text-muted")" @onclick='() => AlternarAba("cadastro")'>
                     <i class="fa-solid fa-user-plus me-1"></i> Criar Conta
                 </button>
             </div>
@@ -28,8 +28,9 @@
             <!-- MENSAGEM ALERTA -->
             @if (!string.IsNullOrEmpty(mensagemAlert))
             {
-                <div class="alert @(sucessoAlert ? "alert-success bg-dark text-success border-success" : "alert-danger bg-dark text-danger border-danger") mb-4" role="alert">
-                    <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") me-2"></i> @mensagemAlert
+                <div class="alert @(sucessoAlert ? "alert-bank-success" : "alert-bank-danger") mb-4 p-3 d-flex align-items-center" role="alert">
+                    <i class="fa-solid @(sucessoAlert ? "fa-circle-check" : "fa-triangle-exclamation") fs-5 me-2"></i>
+                    <span class="fw-medium">@mensagemAlert</span>
                 </div>
             }
 
@@ -38,12 +39,12 @@
                 <!-- FORMULÁRIO DE LOGIN -->
                 <EditForm Model="loginModel" OnValidSubmit="ExecutarLogin">
                     <div class="mb-3">
-                        <label class="form-label text-muted small">CPF ou Número da Conta</label>
+                        <label class="form-label text-muted small fw-semibold">CPF ou Número da Conta</label>
                         <InputText @bind-Value="loginModel.DocumentoOuConta" class="form-input" placeholder="Ex: 12345678909 ou 5001" />
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label text-muted small">Senha</label>
+                        <label class="form-label text-muted small fw-semibold">Senha de Acesso</label>
                         <InputText @bind-Value="loginModel.Senha" type="password" class="form-input" placeholder="••••••••" />
                     </div>
 
@@ -55,6 +56,7 @@
                         }
                         else
                         {
+                            <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>
                             <span>Entrar na Minha Conta</span>
                         }
                     </button>
@@ -65,28 +67,28 @@
                 <!-- FORMULÁRIO DE CADASTRO -->
                 <EditForm Model="registerModel" OnValidSubmit="ExecutarCadastro">
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Nome Completo</label>
+                        <label class="form-label text-muted small fw-semibold">Nome Completo</label>
                         <InputText @bind-Value="registerModel.Nome" class="form-input" placeholder="Ex: Carlos Eduardo" />
                     </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label text-muted small">CPF Válido</label>
+                            <label class="form-label text-muted small fw-semibold">CPF (apenas números)</label>
                             <InputText @bind-Value="registerModel.Cpf" class="form-input" placeholder="Ex: 12345678909" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small">Número da Conta</label>
+                            <label class="form-label text-muted small fw-semibold">Número da Conta</label>
                             <InputNumber @bind-Value="registerModel.NumeroConta" class="form-input" placeholder="Ex: 5001" />
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label text-muted small">E-mail</label>
+                        <label class="form-label text-muted small fw-semibold">E-mail</label>
                         <InputText @bind-Value="registerModel.Email" type="email" class="form-input" placeholder="seu@email.com" />
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label text-muted small">Senha de Acesso</label>
+                        <label class="form-label text-muted small fw-semibold">Senha de Acesso</label>
                         <InputText @bind-Value="registerModel.Senha" type="password" class="form-input" placeholder="••••••••" />
                     </div>
 
@@ -98,6 +100,7 @@
                         }
                         else
                         {
+                            <i class="fa-solid fa-user-check me-1"></i>
                             <span>Cadastrar e Abrir Conta</span>
                         }
                     </button>
@@ -139,7 +142,6 @@
 
         if (result.Sucesso && !string.IsNullOrEmpty(result.Dados))
         {
-            // Se logar via número da conta ou CPF, configura a sessão
             int.TryParse(loginModel.DocumentoOuConta, out int numConta);
             if (numConta == 0) numConta = 5001;
 
@@ -147,7 +149,7 @@
 
             sucessoAlert = true;
             mensagemAlert = "Autenticado com sucesso! Redirecionando...";
-            await Task.Delay(800);
+            await Task.Delay(600);
             Navigation.NavigateTo("/");
         }
         else
@@ -205,7 +207,7 @@
 
             sucessoAlert = true;
             mensagemAlert = "Conta cadastrada com sucesso! Redirecionando para o Dashboard...";
-            await Task.Delay(1000);
+            await Task.Delay(800);
             Navigation.NavigateTo("/");
         }
         else
@@ -215,3 +217,4 @@
         }
     }
 }
+

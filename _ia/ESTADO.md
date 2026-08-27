@@ -21,7 +21,7 @@ Alta
 
 ## Status Em Uma Linha
 
-Aplicação Blazor Web App (BankMore.Web) em .NET 8 criada e integrada à API e Docker na porta 5001.
+Aplicação Blazor Web App (BankMore.Web) atualizada com design moderno e paleta de tons suaves de banco digital real.
 
 ## Proxima Acao
 
