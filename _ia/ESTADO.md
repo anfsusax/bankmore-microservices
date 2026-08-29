@@ -21,11 +21,11 @@ Alta
 
 ## Status Em Uma Linha
 
-Aplicação Blazor Web App (BankMore.Web) atualizada com design moderno e paleta de tons suaves de banco digital real.
+Aplicação .NET 8 com API, Blazor e operações bancárias; transferências agora usam uma transação única para saldo, movimentos, registro da transferência e idempotência.
 
 ## Proxima Acao
 
-Testar a navegação e operações bancárias na interface Blazor via navegador em http://localhost:5001.
+Executar teste de integração concorrente no PostgreSQL ou SQL Server para confirmar saldo, idempotência e rollback de transferências sob carga.
 
 ## Ferramenta Recomendada
 
@@ -38,3 +38,4 @@ Historicos/HISTORICO_001.md
 ## O Que Nao Fazer Agora
 
 - Nao alterar rotas da API sem necessidade.
+- Nao integrar pagamentos externos ou dinheiro real; o BankMore permanece uma simulação educacional.

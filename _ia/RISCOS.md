@@ -30,11 +30,23 @@ Status: [ATIVO] | [MITIGADO] | [RESOLVIDO]
 **Mitigacao:** definir objetivo antes de qualquer execucao tecnica.
 **Atualizado em:** 2026-08-24
 
+### [ATIVO] Atomicidade Ainda Não Exercitada Em Banco Real Sob Concorrência
+
+**Descricao:** a implementação compila e possui testes unitários de orquestração, mas ainda não foi executada contra PostgreSQL ou SQL Server com várias transferências simultâneas.
+**Impacto:** diferenças de lock, serialização ou tratamento de colisão podem aparecer somente em integração.
+**Mitigacao:** criar cenário de integração com saldo finito, chaves duplicadas e falhas injetadas antes de usar o fluxo como base do laboratório de pagamentos.
+**Atualizado em:** 2026-08-29
+
 ---
 
 ## Riscos Mitigados
 
-Nenhum.
+### [MITIGADO] Transferência Parcial ou Saldo Divergente
+
+**Descricao:** débito, crédito, transferência e chave de idempotência eram persistidos separadamente; transferências não atualizavam a projeção de saldo.
+**Impacto:** falhas ou concorrência podiam deixar dados financeiros inconsistentes.
+**Mitigacao:** `TransferenciaFinanceiraEfCore` executa débito condicional, crédito, movimentos, transferência e idempotência em uma única transação serializável.
+**Atualizado em:** 2026-08-29
 
 ---
 

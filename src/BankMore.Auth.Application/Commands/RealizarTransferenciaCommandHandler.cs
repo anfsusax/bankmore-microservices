@@ -1,45 +1,38 @@
-﻿using BankMore.Auth.Domain.Entities;
 using BankMore.Auth.Domain.Repositories;
 using MediatR;
 
 namespace BankMore.Auth.Application.Commands
 {
-    internal class RealizarTransferenciaCommandHandler : IRequestHandler<RealizarTransferenciaCommand, Guid>
+    public class RealizarTransferenciaCommandHandler : IRequestHandler<RealizarTransferenciaCommand, Guid>
     {
-        private readonly IMovimentoRepository _movimentoRepo;
-        private readonly ITransferenciaRepository _transferenciaRepo;
-        private readonly IIdempotenciaRepository _idempotenciaRepo;
+        private readonly ITransferenciaFinanceira _transferencias;
 
-        public RealizarTransferenciaCommandHandler(IMovimentoRepository movimentoRepo, ITransferenciaRepository transferenciaRepo, IIdempotenciaRepository idempotenciaRepo)
+        public RealizarTransferenciaCommandHandler(ITransferenciaFinanceira transferencias)
         {
-            _movimentoRepo = movimentoRepo;
-            _transferenciaRepo = transferenciaRepo;
-            _idempotenciaRepo = idempotenciaRepo;
+            _transferencias = transferencias;
         }
 
         public async Task<Guid> Handle(RealizarTransferenciaCommand request, CancellationToken cancellationToken)
         {
-            if (await _idempotenciaRepo.ExisteAsync(request.ChaveIdempotencia))
-            {
-                return Guid.Empty;
-            } 
-            var data = DateTime.Now;
-             
-            var chaveIdempotenciaDebito = Guid.NewGuid().ToString();
-            var chaveIdempotenciaCredito = Guid.NewGuid().ToString();
+            if (request.IdContaOrigem == Guid.Empty)
+                throw new ArgumentException("Conta de origem é obrigatória.");
+            if (request.IdContaDestino == Guid.Empty)
+                throw new ArgumentException("Conta de destino é obrigatória.");
+            if (request.IdContaOrigem == request.IdContaDestino)
+                throw new ArgumentException("As contas de origem e destino devem ser diferentes.");
+            if (request.Valor <= 0)
+                throw new ArgumentException("O valor da transferência deve ser maior que zero.");
+            if (string.IsNullOrWhiteSpace(request.ChaveIdempotencia))
+                throw new ArgumentException("Chave de idempotência é obrigatória.");
 
-            var debito = new Movimento(Guid.NewGuid(), request.IdContaOrigem, data, "D", request.Valor, chaveIdempotenciaDebito);
-            var credito = new Movimento(Guid.NewGuid(), request.IdContaDestino, data, "C", request.Valor, chaveIdempotenciaCredito);
+            var idTransferencia = await _transferencias.ProcessarAsync(
+                request.IdContaOrigem,
+                request.IdContaDestino,
+                request.Valor,
+                request.ChaveIdempotencia,
+                cancellationToken);
 
-            await _movimentoRepo.AdicionarAsync(debito);
-            await _movimentoRepo.AdicionarAsync(credito);
-
-            var transferencia = new Transferencia(Guid.NewGuid(), request.IdContaOrigem, request.IdContaDestino, data, request.Valor);
-            await _transferenciaRepo.AdicionarAsync(transferencia);
-
-            await _idempotenciaRepo.SalvarAsync(request.ChaveIdempotencia, transferencia.Id.ToString());
-
-            return transferencia.Id;
+            return idTransferencia ?? Guid.Empty;
         }
     }
 }

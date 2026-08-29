@@ -28,6 +28,8 @@ Prioridades: [ALTA] | [MEDIA] | [BAIXA]
 - [ ] [ALTA] Definir objetivo real do projeto em ESTADO.md
 - [ ] [ALTA] Preencher ORIGEM.md com problema, motivacao e objetivo
 - [ ] [MEDIA] Preencher o campo objetivo em CONTRATO_DA_IA.md
+- [ ] [ALTA] Criar teste de integração concorrente para transferências com PostgreSQL ou SQL Server.
+- [ ] [ALTA] Definir identificador explícito entre cliente do EasyControlWeb e conta do BankMore antes da integração de pagamentos.
 
 ## Concluidas
 
@@ -41,6 +43,7 @@ Prioridades: [ALTA] | [MEDIA] | [BAIXA]
 - [x] [ALTA] Atualizar docker-compose.yml e Dockerfile com PostgreSQL e healthcheck — 2026-08-24
 - [x] [ALTA] Converter script DDL sql/create.sql para sintaxe PostgreSQL com tipo UUID — 2026-08-24
 - [x] [ALTA] Criar estrutura inicial do projeto — 2026-08-24
+- [x] [ALTA] Tornar transferência atômica e idempotente no EF Core — 2026-08-29
 
 ---
 

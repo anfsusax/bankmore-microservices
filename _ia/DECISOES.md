@@ -26,6 +26,12 @@ ou qualquer coisa que impacte o futuro do projeto.
 
 ## Registro De Decisoes
 
+### 2026-08-29 — Transferência Financeira Atômica
+
+**Contexto:** a transferência persistia débito, crédito, transferência e idempotência em chamadas separadas, permitindo inconsistência em caso de falha ou concorrência.
+**Decisao:** concentrar a operação em uma porta transacional (`ITransferenciaFinanceira`) implementada por EF Core com isolamento serializável. O débito condicional e o crédito, movimentos, transferência e idempotência são confirmados em uma única transação.
+**Impacto:** mensagens duplicadas retornam conflito sem nova cobrança; uma falha reverte todas as gravações. A validação de carga real permanece pendente.
+
 ### 2026-08-25 — Reformulação Visual com Paleta Suave de Banco Real
 **Contexto:** o tema escuro anterior apresentava contraste excessivo e pouca aderência estética aos padrões de bancos digitais e corporativos reais do dia a dia.
 **Decisao:** remodelar todo o design system no `app.css` e componentes Blazor para utilizar superfícies claras em tons suaves (Slate/Soft Pearl `#f8fafc` e `#f1f5f9`), cartões brancos com sombras suaves, detalhes em Royal Blue (`#2563eb`), cartão digital azul-marinho com chip metálico e tabelas financeiras limpas.

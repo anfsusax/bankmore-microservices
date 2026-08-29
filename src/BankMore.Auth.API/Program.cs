@@ -51,6 +51,7 @@ builder.Services.AddScoped<IUsuarioRepository, UsuarioRepositoryEfCore>();
 builder.Services.AddScoped<IMovimentoRepository, MovimentoRepositoryEfCore>();
 builder.Services.AddScoped<ITransferenciaRepository, TransferenciaRepositoryEfCore>();
 builder.Services.AddScoped<IIdempotenciaRepository, IdempotenciaRepositoryEfCore>();
+builder.Services.AddScoped<ITransferenciaFinanceira, TransferenciaFinanceiraEfCore>();
 #endregion // ===============================================================================================
 
 #region ⚙️ MediatR + FluentValidation // ====================================================================
