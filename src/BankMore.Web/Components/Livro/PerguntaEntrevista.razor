@@ -1,0 +1,13 @@
+<div class="livro-entrevista">
+    <div class="livro-tag azul">🎤 Pergunta de entrevista</div>
+    <p class="livro-entrevista-pergunta">@Pergunta</p>
+    <details>
+        <summary>Ver uma boa resposta</summary>
+        <div class="livro-entrevista-resposta">@ChildContent</div>
+    </details>
+</div>
+
+@code {
+    [Parameter] public string Pergunta { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

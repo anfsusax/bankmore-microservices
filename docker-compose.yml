@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: bankmoredb
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: MinhaSenha123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env (copie de .env.example)}
     ports:
       - "5433:5432"
     volumes:
@@ -53,8 +53,8 @@ services:
       - DOTNET_RUNNING_IN_CONTAINER=true
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__PostgreSql=Host=postgres;Port=5432;Database=bankmoredb;Username=postgres;Password=MinhaSenha123;
-      - JwtSettings__SecretKey=minha-chave-super-secreta-para-bankmore-1234567890
+      - ConnectionStrings__PostgreSql=Host=postgres;Port=5432;Database=bankmoredb;Username=postgres;Password=${POSTGRES_PASSWORD};
+      - JwtSettings__SecretKey=${JWT_SECRET_KEY:?Defina JWT_SECRET_KEY no arquivo .env (mínimo 32 caracteres)}
       - JwtSettings__Issuer=BankMore.Issuer
       - JwtSettings__Audience=BankMore.Audience
       - JwtSettings__ExpiresInMinutes=60

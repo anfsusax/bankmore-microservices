@@ -17,7 +17,7 @@ namespace BankMore.Auth.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -42,6 +42,10 @@ namespace BankMore.Auth.Infrastructure.Migrations
                     b.Property<DateTime>("CriadoEm")
                         .HasColumnType("datetime2")
                         .HasColumnName("criadoEm");
+
+                    b.Property<Guid?>("IdUsuario")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("idusuario");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -73,6 +77,15 @@ namespace BankMore.Auth.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("PK_ContaCorrente");
+
+                    b.HasIndex("IdUsuario")
+                        .IsUnique()
+                        .HasDatabaseName("idx_contacorrente_usuario")
+                        .HasFilter("[idusuario] IS NOT NULL");
+
+                    b.HasIndex("Numero")
+                        .IsUnique()
+                        .HasDatabaseName("idx_contacorrente_numero");
 
                     b.ToTable("contacorrente", (string)null);
                 });

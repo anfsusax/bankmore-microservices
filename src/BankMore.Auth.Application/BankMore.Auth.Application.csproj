@@ -1,19 +1,22 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 	</PropertyGroup>
 
+	<!--
+		Application não depende mais de ASP.NET Core (Microsoft.AspNetCore.Http.Abstractions foi removido).
+		O usuário autenticado chega por IUsuarioAtual, implementado na camada API.
+	-->
 	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
 		<PackageReference Include="FluentValidation" Version="11.8.1" />
 		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.8.1" />
 		<PackageReference Include="MediatR" Version="12.2.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
-		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.1.2" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.14" />
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.23.0" />
 	</ItemGroup>
 
 	<ItemGroup>

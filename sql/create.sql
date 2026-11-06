@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- Tabela de Contas Correntes
 CREATE TABLE IF NOT EXISTS contacorrente (
     idcontacorrente UUID PRIMARY KEY,
+    -- Titular. Referência por ID SEM FK para usuarios, de propósito:
+    -- o Identity será extraído como microsserviço com banco próprio (docs/adr/ADR-002).
+    idusuario UUID NULL,
     numero INT NOT NULL UNIQUE,
     nome VARCHAR(100) NOT NULL,
     ativo BOOLEAN NOT NULL DEFAULT TRUE,
@@ -65,6 +68,8 @@ CREATE TABLE IF NOT EXISTS idempotencia (
 CREATE INDEX IF NOT EXISTS idx_usuarios_cpf ON usuarios(cpf);
 CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
 CREATE INDEX IF NOT EXISTS idx_contacorrente_numero ON contacorrente(numero);
+-- Uma conta por titular
+CREATE UNIQUE INDEX IF NOT EXISTS idx_contacorrente_usuario ON contacorrente(idusuario) WHERE idusuario IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_movimento_conta ON movimento(idcontacorrente);
 CREATE INDEX IF NOT EXISTS idx_movimento_data ON movimento(datamovimento);
 CREATE INDEX IF NOT EXISTS idx_movimento_idempotencia ON movimento(chave_idempotencia);

@@ -1,65 +1,47 @@
 using BankMore.Auth.Application.Commands;
 using BankMore.Auth.Application.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BankMore.Auth.API.Controllers
 {
+    /// <summary>
+    /// Todas as rotas exigem autenticação. As antigas rotas públicas de saldo
+    /// (/contas/{id}/saldo e /contas/numero/{n}/saldo) foram removidas: expunham o saldo de qualquer conta.
+    /// </summary>
     [ApiController]
+    [Authorize]
     [Route("api/[controller]")]
     public class ContaCorrenteController : ControllerBase
     {
         private readonly IMediator _mediator;
-        private readonly BankMore.Auth.Domain.Repositories.IContaCorrenteRepository _repository;
 
-        public ContaCorrenteController(IMediator mediator, BankMore.Auth.Domain.Repositories.IContaCorrenteRepository repository)
+        public ContaCorrenteController(IMediator mediator)
         {
             _mediator = mediator;
-            _repository = repository;
         }
 
+        /// <summary>Abre a conta corrente do usuário autenticado (uma por titular).</summary>
         [HttpPost]
-        public async Task<IActionResult> Criar([FromBody] CriarContaCorrenteCommand command)
+        public async Task<IActionResult> Criar([FromBody] CriarContaCorrenteCommand command, CancellationToken cancellationToken)
         {
-            var id = await _mediator.Send(command);
-            return CreatedAtAction(nameof(Criar), new { id }, new { id });
+            var id = await _mediator.Send(command, cancellationToken);
+            return CreatedAtAction(nameof(MinhaConta), null, new { id });
         }
 
-        [HttpGet("contas/{id:guid}/saldo")]
-        public async Task<IActionResult> ObterSaldo(Guid id)
+        /// <summary>Conta e saldo do usuário autenticado.</summary>
+        [HttpGet("minha")]
+        public async Task<ActionResult<SaldoResult>> MinhaConta(CancellationToken cancellationToken)
         {
-            var saldo = await _mediator.Send(new ObterSaldoQuery(id));
-            return Ok(saldo);
+            return Ok(await _mediator.Send(new GetSaldoQuery(), cancellationToken));
         }
 
-        [HttpGet("contas/numero/{numero:int}/saldo")]
-        public async Task<IActionResult> ObterSaldoPorNumero(int numero)
-        {
-            var conta = await _repository.ObterPorNumeroAsync(numero);
-            if (conta == null)
-                return NotFound(new { message = "Conta não encontrada." });
-
-            return Ok(conta.Saldo);
-        }
-
+        /// <summary>Confirma o destino de uma transferência: número + titular mascarado. Sem saldo.</summary>
         [HttpGet("contas/numero/{numero:int}")]
-        public async Task<IActionResult> ObterContaPorNumero(int numero)
+        public async Task<ActionResult<ContaDestinoResult>> ObterContaDestino(int numero, CancellationToken cancellationToken)
         {
-            var conta = await _repository.ObterPorNumeroAsync(numero);
-            if (conta == null)
-                return NotFound(new { message = "Conta não encontrada." });
-
-            return Ok(new
-            {
-                id = conta.Id,
-                numero = conta.Numero,
-                nome = conta.Nome,
-                saldo = conta.Saldo,
-                ativo = conta.Ativo,
-                criadoEm = conta.CriadoEm
-            });
+            return Ok(await _mediator.Send(new ObterContaDestinoQuery(numero), cancellationToken));
         }
-
-
     }
 }

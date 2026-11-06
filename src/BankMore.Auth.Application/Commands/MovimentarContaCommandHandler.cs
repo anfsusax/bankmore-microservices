@@ -1,79 +1,64 @@
+using BankMore.Auth.Application.Abstractions;
 using BankMore.Auth.Domain.Entities;
+using BankMore.Auth.Domain.Exceptions;
 using BankMore.Auth.Domain.Repositories;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 
 namespace BankMore.Auth.Application.Commands
 {
-    public class MovimentarContaCommandHandler : IRequestHandler<MovimentarContaCommand, Unit>
+    public class MovimentarContaCommandHandler : IRequestHandler<MovimentarContaCommand, ResultadoOperacaoFinanceira>
     {
-        private readonly IContaCorrenteRepository _contaRepo;
-        private readonly IMovimentoRepository _movimentoRepo;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IContaCorrenteRepository _contas;
+        private readonly IMovimentacaoFinanceira _movimentacao;
+        private readonly IUsuarioAtual _usuarioAtual;
 
         public MovimentarContaCommandHandler(
-            IContaCorrenteRepository contaRepo,
-            IMovimentoRepository movimentoRepo,
-            IHttpContextAccessor httpContextAccessor)
+            IContaCorrenteRepository contas,
+            IMovimentacaoFinanceira movimentacao,
+            IUsuarioAtual usuarioAtual)
         {
-            _contaRepo = contaRepo;
-            _movimentoRepo = movimentoRepo;
-            _httpContextAccessor = httpContextAccessor;
+            _contas = contas;
+            _movimentacao = movimentacao;
+            _usuarioAtual = usuarioAtual;
         }
 
-        public async Task<Unit> Handle(MovimentarContaCommand request, CancellationToken cancellationToken)
+        public async Task<ResultadoOperacaoFinanceira> Handle(MovimentarContaCommand request, CancellationToken cancellationToken)
         {
-            var userId = _httpContextAccessor.HttpContext?.User?.FindFirst("id")?.Value;
-            if (userId is null)
-                throw new UnauthorizedAccessException("Usuário não autenticado ou token inválido.");
-
-            var idempotenteExiste = await _movimentoRepo.ExisteIdempotenciaAsync(request.ChaveIdempotencia);
-            if (idempotenteExiste)
-                return Unit.Value;
-
-            ContaCorrente? conta = null;
-            if (request.NumeroConta.HasValue)
-            {
-                conta = await _contaRepo.ObterPorNumeroAsync(request.NumeroConta.Value);
-            }
-            else if (Guid.TryParse(userId, out var idContaGuid))
-            {
-                conta = await _contaRepo.ObterPorIdAsync(idContaGuid);
-            }
-
-            if (conta is null)
-                throw new InvalidOperationException(request.NumeroConta.HasValue 
-                    ? $"Conta corrente número {request.NumeroConta.Value} não encontrada." 
-                    : "Conta corrente não encontrada.");
-
-            if (!conta.Ativo)
-                throw new InvalidOperationException("Conta corrente inativa.");
+            if (request.Tipo != "C" && request.Tipo != "D")
+                throw new ArgumentException("Tipo de movimentação inválido. Utilize 'C' (Crédito) ou 'D' (Débito).");
 
             if (request.Valor <= 0)
-                throw new InvalidOperationException("O valor da operação deve ser maior que zero.");
+                throw new ArgumentException("O valor da operação deve ser maior que zero.");
 
-            if (request.Tipo != "C" && request.Tipo != "D")
-                throw new InvalidOperationException("Tipo de movimentação inválido. Utilize 'C' (Crédito) ou 'D' (Débito).");
+            var idUsuario = _usuarioAtual.ObterIdUsuario();
+            var chave = ChaveIdempotencia.Escopar(idUsuario, request.ChaveIdempotencia);
 
-            if (request.Tipo == "D" && conta.Saldo < request.Valor)
-                throw new InvalidOperationException($"Saldo insuficiente para realizar o saque. Saldo atual: R$ {conta.Saldo:N2}, valor solicitado: R$ {request.Valor:N2}.");
+            var contaDoTitular = await _contas.ObterPorUsuarioAsync(idUsuario)
+                ?? throw new RecursoNaoEncontradoException("INVALID_ACCOUNT", "O usuário autenticado não possui conta corrente.");
 
-            Movimento movimento;
-            if (request.Tipo == "C")
-            {
-                movimento = Movimento.CriarCredito(conta.Id, request.Valor, request.ChaveIdempotencia, request.Descricao ?? "Depósito");
-            }
-            else
-            {
-                movimento = Movimento.CriarDebito(conta.Id, request.Valor, request.ChaveIdempotencia, request.Descricao ?? "Saque");
-            }
+            var contaAlvo = await ResolverContaAlvoAsync(request, contaDoTitular);
 
-            await _movimentoRepo.AdicionarAsync(movimento);
+            var descricao = string.IsNullOrWhiteSpace(request.Descricao)
+                ? (request.Tipo == "C" ? "Depósito" : "Saque")
+                : request.Descricao.Trim();
 
-            var novoSaldo = await _movimentoRepo.CalcularSaldoAsync(conta.Id);
-            await _contaRepo.AtualizarSaldoAsync(conta.Id, novoSaldo);
+            // Saldo suficiente e conta ativa são garantidos pelo UPDATE condicional dentro da transação.
+            return await _movimentacao.MovimentarAsync(
+                contaAlvo.Id, request.Tipo, request.Valor, chave, descricao, cancellationToken);
+        }
 
-            return Unit.Value;
+        private async Task<ContaCorrente> ResolverContaAlvoAsync(MovimentarContaCommand request, ContaCorrente contaDoTitular)
+        {
+            if (request.NumeroConta is null || request.NumeroConta == contaDoTitular.Numero)
+                return contaDoTitular;
+
+            // Regra de negócio: dinheiro pode ENTRAR em conta de terceiro (depósito identificado),
+            // mas só o titular pode tirar dinheiro da própria conta.
+            if (request.Tipo == "D")
+                throw new AcessoNegadoException("Saque só pode ser realizado na conta do próprio titular.");
+
+            return await _contas.ObterPorNumeroAsync(request.NumeroConta.Value)
+                ?? throw new RecursoNaoEncontradoException("INVALID_ACCOUNT", $"Conta corrente número {request.NumeroConta.Value} não encontrada.");
         }
     }
 }

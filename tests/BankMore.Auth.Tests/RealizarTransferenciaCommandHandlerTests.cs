@@ -1,74 +1,100 @@
 using BankMore.Auth.Application.Commands;
-using BankMore.Auth.Domain.Repositories;
+using BankMore.Auth.Domain.Exceptions;
+using BankMore.Auth.Tests.Fakes;
 using FluentAssertions;
 
 namespace BankMore.Auth.Tests;
 
 public class RealizarTransferenciaCommandHandlerTests
 {
+    private readonly Guid _alex = Guid.NewGuid();
+    private readonly Guid _maria = Guid.NewGuid();
+    private readonly ContaRepositoryFake _contas = new();
+    private readonly TransferenciaFinanceiraFake _processador = new();
+
+    private RealizarTransferenciaCommandHandler CriarHandler(Guid? usuarioLogado) =>
+        new(_processador, _contas, new UsuarioAtualFake(usuarioLogado));
+
     [Fact]
-    public async Task Deve_Encaminhar_Transferencia_Valida_Para_Processador_Transacional()
+    public async Task Origem_sempre_e_a_conta_do_usuario_autenticado()
     {
-        var origem = Guid.NewGuid();
-        var destino = Guid.NewGuid();
-        var idTransferencia = Guid.NewGuid();
-        var processador = new ProcessadorFake(idTransferencia);
-        var handler = new RealizarTransferenciaCommandHandler(processador);
+        var contaAlex = _contas.Adicionar(_alex, 1001);
+        var contaMaria = _contas.Adicionar(_maria, 2002);
 
-        var resultado = await handler.Handle(
-            new RealizarTransferenciaCommand(origem, destino, 75m, "compra-123"),
-            CancellationToken.None);
+        await CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(2002, 75m, "compra-123"), CancellationToken.None);
 
-        resultado.Should().Be(idTransferencia);
-        processador.ChaveRecebida.Should().Be("compra-123");
-        processador.ValorRecebido.Should().Be(75m);
+        _processador.Origem.Should().Be(contaAlex.Id);
+        _processador.Destino.Should().Be(contaMaria.Id);
+        _processador.Valor.Should().Be(75m);
     }
 
     [Fact]
-    public async Task Deve_Indicar_Conflito_Quando_Chave_Ja_Foi_Processada()
+    public async Task Chave_de_idempotencia_e_escopada_ao_usuario()
     {
-        var handler = new RealizarTransferenciaCommandHandler(new ProcessadorFake(null));
+        _contas.Adicionar(_alex, 1001);
+        _contas.Adicionar(_maria, 2002);
 
-        var resultado = await handler.Handle(
-            new RealizarTransferenciaCommand(Guid.NewGuid(), Guid.NewGuid(), 10m, "duplicada"),
-            CancellationToken.None);
+        await CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(2002, 10m, "abc"), CancellationToken.None);
 
-        resultado.Should().Be(Guid.Empty);
+        _processador.Chave.Should().Be($"{_alex:N}:abc");
     }
 
     [Fact]
-    public async Task Deve_Rejeitar_Transferencia_Entre_A_Mesma_Conta_Sem_Acessar_Infraestrutura()
+    public async Task Requisicao_sem_usuario_autenticado_e_recusada_sem_tocar_na_infraestrutura()
     {
-        var conta = Guid.NewGuid();
-        var processador = new ProcessadorFake(Guid.NewGuid());
-        var handler = new RealizarTransferenciaCommandHandler(processador);
+        _contas.Adicionar(_maria, 2002);
 
-        var acao = () => handler.Handle(
-            new RealizarTransferenciaCommand(conta, conta, 10m, "invalida"),
-            CancellationToken.None);
+        var acao = () => CriarHandler(usuarioLogado: null)
+            .Handle(new RealizarTransferenciaCommand(2002, 10m, "x"), CancellationToken.None);
 
-        await acao.Should().ThrowAsync<ArgumentException>()
-            .WithMessage("*devem ser diferentes*");
-        processador.FoiChamado.Should().BeFalse();
+        await acao.Should().ThrowAsync<UnauthorizedAccessException>();
+        _processador.FoiChamado.Should().BeFalse();
     }
 
-    private sealed class ProcessadorFake : ITransferenciaFinanceira
+    [Fact]
+    public async Task Usuario_sem_conta_recebe_nao_encontrado()
     {
-        private readonly Guid? _resultado;
+        _contas.Adicionar(_maria, 2002);
 
-        public ProcessadorFake(Guid? resultado) => _resultado = resultado;
+        var acao = () => CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(2002, 10m, "x"), CancellationToken.None);
 
-        public bool FoiChamado { get; private set; }
-        public decimal ValorRecebido { get; private set; }
-        public string? ChaveRecebida { get; private set; }
+        await acao.Should().ThrowAsync<RecursoNaoEncontradoException>();
+        _processador.FoiChamado.Should().BeFalse();
+    }
 
-        public Task<Guid?> ProcessarAsync(Guid idContaOrigem, Guid idContaDestino, decimal valor,
-            string chaveIdempotencia, CancellationToken cancellationToken = default)
-        {
-            FoiChamado = true;
-            ValorRecebido = valor;
-            ChaveRecebida = chaveIdempotencia;
-            return Task.FromResult(_resultado);
-        }
+    [Fact]
+    public async Task Rejeita_transferencia_para_a_propria_conta()
+    {
+        _contas.Adicionar(_alex, 1001);
+
+        var acao = () => CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(1001, 10m, "x"), CancellationToken.None);
+
+        await acao.Should().ThrowAsync<ArgumentException>().WithMessage("*devem ser diferentes*");
+        _processador.FoiChamado.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public async Task Rejeita_valor_nao_positivo(decimal valor)
+    {
+        var acao = () => CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(2002, valor, "x"), CancellationToken.None);
+
+        await acao.Should().ThrowAsync<ArgumentException>();
+        _processador.FoiChamado.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Replay_e_repassado_ao_chamador()
+    {
+        _contas.Adicionar(_alex, 1001);
+        _contas.Adicionar(_maria, 2002);
+        var original = Guid.NewGuid();
+        _processador.Resultado = new(original, Replay: true);
+
+        var resultado = await CriarHandler(_alex).Handle(new RealizarTransferenciaCommand(2002, 10m, "dup"), CancellationToken.None);
+
+        resultado.Id.Should().Be(original);
+        resultado.Replay.Should().BeTrue();
     }
 }

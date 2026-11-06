@@ -159,9 +159,9 @@
                 numConta = parsedNum;
             }
 
-            if (saldo == 0m && numConta > 0)
+            if (saldo == 0m)
             {
-                saldo = await ApiClient.ObterSaldoPorNumeroAsync(numConta);
+                saldo = await ApiClient.ObterSaldoAsync(token);
             }
 
             Session.DefinirSessao(token, nome, cpf, numConta, contaId, saldo);
@@ -201,27 +201,35 @@
             return;
         }
 
-        // 2. Cria Conta Corrente
+        // 2. Login: a conta é aberta em nome do usuário autenticado (o titular vem do token)
+        var loginRes = await ApiClient.LoginAsync(new LoginModel
+        {
+            DocumentoOuConta = registerModel.Cpf,
+            Senha = registerModel.Senha
+        });
+
+        if (!loginRes.Sucesso || loginRes.Dados is null)
+        {
+            processando = false;
+            sucessoAlert = false;
+            mensagemAlert = loginRes.Mensagem;
+            return;
+        }
+
+        var token = loginRes.Dados.Token;
+
+        // 3. Abre a Conta Corrente
         var contaResult = await ApiClient.CriarContaCorrenteAsync(new CriarContaModel
         {
             Nome = registerModel.Nome,
             Numero = registerModel.NumeroConta,
             Senha = registerModel.Senha
-        });
+        }, token);
 
         processando = false;
 
         if (contaResult.Sucesso)
         {
-            // 3. Fazer Login automático
-            var loginRes = await ApiClient.LoginAsync(new LoginModel
-            {
-                DocumentoOuConta = registerModel.Cpf,
-                Senha = registerModel.Senha
-            });
-
-            var token = loginRes.Sucesso && loginRes.Dados != null ? loginRes.Dados.Token : "";
-
             Session.DefinirSessao(token, registerModel.Nome, registerModel.Cpf, registerModel.NumeroConta, contaResult.Dados, 0m);
 
             sucessoAlert = true;

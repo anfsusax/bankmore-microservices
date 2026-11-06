@@ -1,0 +1,10 @@
+<div class="livro-decisao">
+    <div class="livro-tag roxo">⚖️ Decisão de arquitetura</div>
+    <h4>@Titulo</h4>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string Titulo { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

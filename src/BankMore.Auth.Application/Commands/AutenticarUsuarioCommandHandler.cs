@@ -37,19 +37,21 @@ namespace BankMore.Auth.Application.Commands
                 throw new UnauthorizedAccessException("Senha inválida");
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var secretKey = _config["JwtSettings:SecretKey"];
+            var secretKey = _config["JwtSettings:SecretKey"]
+                ?? throw new InvalidOperationException("JwtSettings:SecretKey não configurada.");
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new[]
                 {
+                    // CPF e e-mail saíram do token: o payload do JWT é só Base64 (qualquer um lê)
+                    // e acaba copiado em logs e traces. Dado pessoal não viaja no token (LGPD).
+                    new Claim(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
                     new Claim("id", usuario.Id.ToString()),
-                    new Claim("nome", usuario.Nome),
-                    new Claim("cpf", usuario.Cpf.Numero),
-                    new Claim("email", usuario.Email.Endereco)
+                    new Claim("nome", usuario.Nome)
                 }),
-                Expires = DateTime.UtcNow.AddMinutes(int.Parse(_config["JwtSettings:ExpiresInMinutes"])),  
+                Expires = DateTime.UtcNow.AddMinutes(int.Parse(_config["JwtSettings:ExpiresInMinutes"] ?? "60")),  
                 Issuer = _config["JwtSettings:Issuer"],
                 Audience = _config["JwtSettings:Audience"],
                 SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)

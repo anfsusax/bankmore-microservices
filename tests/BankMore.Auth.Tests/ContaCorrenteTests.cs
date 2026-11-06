@@ -15,7 +15,7 @@ public class ContaCorrenteTests
         var salt = "salt123";
 
         // Act
-        var conta = ContaCorrente.Criar(numero, nome, senhaHash, salt);
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), numero, nome, senhaHash, salt);
 
         // Assert
         conta.Should().NotBeNull();
@@ -34,7 +34,7 @@ public class ContaCorrenteTests
     public void Deve_Lancar_Excecao_Para_Numero_Invalido(int numeroInvalido)
     {
         // Act & Assert
-        Action acao = () => ContaCorrente.Criar(numeroInvalido, "Nome", "senha", "salt");
+        Action acao = () => ContaCorrente.Criar(Guid.NewGuid(), numeroInvalido, "Nome", "senha", "salt");
         acao.Should().Throw<ArgumentException>().WithMessage("*maior que zero*");
     }
 
@@ -45,7 +45,7 @@ public class ContaCorrenteTests
     public void Deve_Lancar_Excecao_Para_Nome_Vazio(string nomeInvalido)
     {
         // Act & Assert
-        Action acao = () => ContaCorrente.Criar(123, nomeInvalido, "senha", "salt");
+        Action acao = () => ContaCorrente.Criar(Guid.NewGuid(), 123, nomeInvalido, "senha", "salt");
         acao.Should().Throw<ArgumentException>().WithMessage("*obrigatório*");
     }
 
@@ -53,7 +53,7 @@ public class ContaCorrenteTests
     public void Deve_Creditar_Valor_Na_Conta()
     {
         // Arrange
-        var conta = ContaCorrente.Criar(123, "Nome", "senha", "salt");
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), 123, "Nome", "senha", "salt");
         var valorCredito = 100.50m;
 
         // Act
@@ -68,7 +68,7 @@ public class ContaCorrenteTests
     public void Deve_Debitar_Valor_Da_Conta()
     {
         // Arrange
-        var conta = ContaCorrente.Criar(123, "Nome", "senha", "salt");
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), 123, "Nome", "senha", "salt");
         conta.Creditar(200m);
         var valorDebito = 50m;
 
@@ -84,7 +84,7 @@ public class ContaCorrenteTests
     public void Deve_Lancar_Excecao_Ao_Debitar_Valor_Maior_Que_Saldo()
     {
         // Arrange
-        var conta = ContaCorrente.Criar(123, "Nome", "senha", "salt");
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), 123, "Nome", "senha", "salt");
         conta.Creditar(100m);
 
         // Act & Assert
@@ -96,7 +96,7 @@ public class ContaCorrenteTests
     public void Deve_Desativar_Conta()
     {
         // Arrange
-        var conta = ContaCorrente.Criar(123, "Nome", "senha", "salt");
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), 123, "Nome", "senha", "salt");
 
         // Act
         conta.Desativar();
@@ -110,12 +110,30 @@ public class ContaCorrenteTests
     public void Deve_Verificar_Saldo_Suficiente()
     {
         // Arrange
-        var conta = ContaCorrente.Criar(123, "Nome", "senha", "salt");
+        var conta = ContaCorrente.Criar(Guid.NewGuid(), 123, "Nome", "senha", "salt");
         conta.Creditar(100m);
 
         // Act & Assert
         conta.TemSaldoSuficiente(50m).Should().BeTrue();
         conta.TemSaldoSuficiente(100m).Should().BeTrue();
         conta.TemSaldoSuficiente(150m).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Conta_sem_titular_nao_pode_ser_criada()
+    {
+        Action acao = () => ContaCorrente.Criar(Guid.Empty, 123, "Nome", "senha", "salt");
+
+        acao.Should().Throw<ArgumentException>().WithMessage("*titular*");
+    }
+
+    [Fact]
+    public void Conta_pertence_somente_ao_seu_titular()
+    {
+        var titular = Guid.NewGuid();
+        var conta = ContaCorrente.Criar(titular, 123, "Nome", "senha", "salt");
+
+        conta.PertenceA(titular).Should().BeTrue();
+        conta.PertenceA(Guid.NewGuid()).Should().BeFalse();
     }
 }

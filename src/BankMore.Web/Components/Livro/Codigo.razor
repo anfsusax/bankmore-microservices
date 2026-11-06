@@ -1,0 +1,17 @@
+<figure class="livro-codigo @(Antes ? "codigo-antes" : Depois ? "codigo-depois" : "")">
+    <figcaption>
+        @if (Antes) { <span class="livro-tag vermelho">ANTES</span> }
+        @if (Depois) { <span class="livro-tag verde">DEPOIS</span> }
+        <span>@Titulo</span>
+        @if (!string.IsNullOrEmpty(Arquivo)) { <code class="livro-arquivo">@Arquivo</code> }
+    </figcaption>
+    <pre><code>@Fonte</code></pre>
+</figure>
+
+@code {
+    [Parameter] public string Titulo { get; set; } = "";
+    [Parameter] public string? Arquivo { get; set; }
+    [Parameter] public string Fonte { get; set; } = "";
+    [Parameter] public bool Antes { get; set; }
+    [Parameter] public bool Depois { get; set; }
+}

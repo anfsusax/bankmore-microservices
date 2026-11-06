@@ -2,16 +2,18 @@ using System.Text;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using BankMore.Auth.API.Middleware;
+using BankMore.Auth.API.Seguranca;
+using BankMore.Auth.Application.Abstractions;
 using BankMore.Auth.Application.Commands;
 using BankMore.Auth.Application.Behaviors;
 using BankMore.Auth.Domain.Repositories;
 using BankMore.Auth.Infrastructure.Persistence;
 using BankMore.Auth.Infrastructure.Repositories;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,20 +32,22 @@ if (isDocker)
 {
     var connectionString = builder.Configuration.GetConnectionString("PostgreSql") 
                            ?? builder.Configuration.GetConnectionString("MySql");
+    // EnableRetryOnFailure: deadlock/falha transitória refaz a transação inteira (ver TransferenciaFinanceiraEfCore).
     builder.Services.AddDbContext<BankMoreDbContext>(options =>
-        options.UseNpgsql(connectionString));
+        options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure(3)));
 }
 else
 {
     var connectionString = builder.Configuration.GetConnectionString("SqlServer");
     builder.Services.AddDbContext<BankMoreDbContext>(options =>
-        options.UseSqlServer(connectionString));
+        options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure(3)));
 }
 #endregion // ===============================================================================================
 
 #region 📦 Injeções de Dependência (Repositories) // ===================================================
-// HttpContextAccessor necessário para alguns handlers
+// Usuário autenticado: a Application recebe IUsuarioAtual, só a API conhece HttpContext.
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUsuarioAtual, UsuarioAtualHttp>();
 
 // Repositórios EF Core (PostgreSQL / Dual Provider)
 builder.Services.AddScoped<IContaCorrenteRepository, ContaCorrenteRepositoryEfCore>();
@@ -52,6 +56,7 @@ builder.Services.AddScoped<IMovimentoRepository, MovimentoRepositoryEfCore>();
 builder.Services.AddScoped<ITransferenciaRepository, TransferenciaRepositoryEfCore>();
 builder.Services.AddScoped<IIdempotenciaRepository, IdempotenciaRepositoryEfCore>();
 builder.Services.AddScoped<ITransferenciaFinanceira, TransferenciaFinanceiraEfCore>();
+builder.Services.AddScoped<IMovimentacaoFinanceira, MovimentacaoFinanceiraEfCore>();
 #endregion // ===============================================================================================
 
 #region ⚙️ MediatR + FluentValidation // ====================================================================
@@ -66,8 +71,11 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBeh
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings.GetValue<string>("SecretKey");
 
-if (string.IsNullOrEmpty(secretKey))
-    throw new Exception("JWT SecretKey não está configurada no appsettings.json");
+// A chave NÃO fica no appsettings.json versionado. Local: appsettings.Development.json ou user-secrets.
+// Docker: variável JwtSettings__SecretKey vinda do arquivo .env (não versionado).
+if (string.IsNullOrWhiteSpace(secretKey) || Encoding.UTF8.GetByteCount(secretKey) < 32)
+    throw new InvalidOperationException(
+        "JwtSettings:SecretKey ausente ou com menos de 32 bytes. Configure via user-secrets ou variável de ambiente.");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -100,87 +108,21 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
 });
 builder.Services.AddRouting(options => options.LowercaseUrls = true);
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 #endregion
 
 var app = builder.Build();
 
-#region 🧱 Middleware Global de Erros
-app.UseExceptionHandler(exceptionApp =>
-{
-    exceptionApp.Run(async context =>
-    {
-        context.Response.ContentType = "application/json";
-
-        var exception = context.Features.Get<IExceptionHandlerFeature>()?.Error;
-        object problem;
-
-        if (exception is ValidationException validationEx)
-        {
-            problem = new
-            {
-                Status = 400,
-                Title = "Erro de validação",
-                Detail = "Dados inválidos fornecidos",
-                Errors = validationEx.Errors.Select(e => new { Field = e.PropertyName, Message = e.ErrorMessage })
-            };
-        }
-        else if (exception is ArgumentException argEx)
-        {
-            problem = new
-            {
-                Status = 400,
-                Title = "Erro de argumento",
-                Detail = argEx.Message
-            };
-        }
-        else if (exception is UnauthorizedAccessException)
-        {
-            problem = new
-            {
-                Status = 401,
-                Title = "Não autorizado",
-                Detail = exception.Message
-            };
-        }
-        else if (exception is InvalidOperationException)
-        {
-            problem = new
-            {
-                Status = 400,
-                Title = "Operação inválida",
-                Detail = exception.Message
-            };
-        }
-        else
-        {
-            problem = new
-            {
-                Status = 500,
-                Title = "Erro interno",
-                Detail = "Ocorreu um erro inesperado."
-            };
-        }
-
-        context.Response.StatusCode = ((dynamic)problem).Status;
-        await context.Response.WriteAsJsonAsync(problem);
-    });
-});
+#region 🧱 Tratamento Global de Erros
+// ProblemDetails (RFC 9457) + mapeamento exceção → status em GlobalExceptionHandler.
+app.UseExceptionHandler();
 #endregion
 
 #region 🚀 Pipeline da Aplicação

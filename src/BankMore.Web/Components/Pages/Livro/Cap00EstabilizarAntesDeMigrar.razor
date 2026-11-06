@@ -1,0 +1,212 @@
+@page "/livro/00-estabilizar-antes-de-migrar"
+@rendermode InteractiveServer
+@using BankMore.Web.Livro
+
+<PageTitle>Cap. 00 — Estabilizar antes de migrar</PageTitle>
+
+<article class="livro">
+    <CabecalhoCapitulo Capitulo="@CatalogoDoLivro.Obter("00")" />
+
+    <section class="livro-secao">
+        <h2>O cenário</h2>
+        <p>Primeiro dia no projeto. O gestor pede a migração do BankMore para microsserviços.
+           Antes de desenhar qualquer serviço, você faz o que um sênior faz: <strong>lê o código e mede o sistema atual</strong>.
+           Em menos de uma hora aparecem seis falhas. Nenhuma delas é "de arquitetura"; todas fazem um banco perder dinheiro.</p>
+    </section>
+
+    <ProblemaObjetivo>
+        <Problema>
+            <p>Migrar um sistema instável <strong>multiplica</strong> o problema: a race condition que hoje está em um processo
+               passa a estar espalhada por cinco serviços, com rede no meio e logs em lugares diferentes.</p>
+        </Problema>
+        <Objetivo>
+            <p>Deixar o monólito <strong>correto e mensurável</strong>: autorização certa, saldo com uma única fonte de verdade,
+               operações atômicas e testes que provam isso. Só então ele vira base para a migração.</p>
+        </Objetivo>
+    </ProblemaObjetivo>
+
+    <Analogia Emoji="🏚️" Titulo="mudança de prédio com vazamento de gás">
+        <p>Ninguém muda os moradores de um prédio com vazamento de gás para um condomínio novo levando os mesmos canos.
+           Você fecha o registro, conserta o vazamento e só depois planeja a mudança.
+           Migrar para microsserviços é a mudança; a Fase 0 é fechar o registro.</p>
+    </Analogia>
+
+    <section class="livro-secao">
+        <h2>As seis falhas encontradas</h2>
+        <div class="table-responsive">
+            <table class="bank-table livro-tabela">
+                <thead><tr><th>#</th><th>Falha</th><th>Como explorar</th><th>Correção</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td><strong>BOLA</strong> na transferência (OWASP API1)</td>
+                        <td>Sem login, mandar <code>IdContaOrigem</code> de outra pessoa no corpo.</td>
+                        <td><code>[Authorize]</code> e origem resolvida a partir do token.</td></tr>
+                    <tr><td>2</td><td>Saque em conta de terceiro</td>
+                        <td>Logado, enviar <code>NumeroConta</code> de outra conta com tipo <code>D</code>.</td>
+                        <td>Débito só na conta do titular; crédito em terceiro continua permitido (depósito identificado).</td></tr>
+                    <tr><td>3</td><td>Conta achada <strong>pelo nome</strong></td>
+                        <td>Dois clientes homônimos: um loga e vê a conta do outro.</td>
+                        <td>Coluna <code>idusuario</code> com índice único (<code>docs/adr/ADR-002</code>).</td></tr>
+                    <tr><td>4</td><td><strong>Double-spend</strong> no saque</td>
+                        <td>Dois saques de R$ 100 simultâneos com saldo de R$ 100. Os dois passam.</td>
+                        <td>UPDATE condicional + movimento + idempotência na mesma transação.</td></tr>
+                    <tr><td>5</td><td>Duas fontes de saldo</td>
+                        <td><code>/api/movimentos</code> gravava movimento sem mexer no saldo. Cada tela mostrava um valor.</td>
+                        <td>Endpoint removido; saldo materializado é a fonte única.</td></tr>
+                    <tr><td>6</td><td>Dados sensíveis expostos</td>
+                        <td>CPF dentro do JWT; senha do banco e chave JWT no repositório; saldo público por número de conta.</td>
+                        <td>Claims mínimas, segredos em <code>.env</code>/user-secrets, consultas de saldo só da própria conta.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <Diagrama Titulo="Falha 4: por que 'checar e depois debitar' perde dinheiro" Definicao="@DiagramaRace" />
+
+    <Codigo Antes Titulo="Três idas ao banco, sem transação" Arquivo="MovimentarContaCommandHandler.cs" Fonte="@CodigoAntes" />
+    <Codigo Depois Titulo="Uma transação: o UPDATE é a própria checagem" Arquivo="MovimentacaoFinanceiraEfCore.cs" Fonte="@CodigoDepois" />
+
+    <Decisao Titulo="READ COMMITTED, não SERIALIZABLE">
+        <p>A versão anterior da transferência usava <code>SERIALIZABLE</code>. Parece mais seguro, mas aqui não acrescenta nada:
+           o <code>UPDATE ... WHERE saldo &gt;= valor</code> já trava a linha e reavalia a condição depois de esperar o lock.
+           O custo do SERIALIZABLE é real: no PostgreSQL, carga concorrente gera erros <code>40001</code> que viram HTTP 500.</p>
+        <p>O que faltava era <strong>repetir com segurança</strong>: <code>EnableRetryOnFailure</code> + execution strategy refazem a
+           transação <em>inteira</em> em caso de deadlock. Repetir só um pedaço de uma operação financeira nunca é seguro.</p>
+    </Decisao>
+
+    <Decisao Titulo="O deadlock que só o teste de carga mostrou">
+        <p>Com o UPDATE condicional e o retry no lugar, o teste de 40 transferências <strong>cruzadas</strong> simultâneas
+           (Alex → Maria e Maria → Alex ao mesmo tempo) ainda devolveu <strong>24 erros 500</strong>. O saldo total continuou
+           correto, porque cada deadlock vira rollback, mas o cliente recebia erro.</p>
+        <p>Causa: a transação A trava a conta do Alex e espera a da Maria; a B trava a da Maria e espera a do Alex.
+           O banco mata uma delas (<code>40P01</code> no PostgreSQL, <code>1205</code> no SQL Server), e sob contenção alta
+           3 retentativas não bastam. Correção: <strong>travar as duas linhas sempre na mesma ordem</strong> (Id crescente).
+           Resultado: 40 de 40 aceitas, zero erros, em 4 execuções seguidas.</p>
+        <p class="mb-0"><em>Lição do capítulo:</em> retry esconde o sintoma; ordem de lock remove a causa.
+           E nenhum teste de unidade teria pegado isso.</p>
+    </Decisao>
+
+    <Decisao Titulo="Idempotência: reenvio não é erro">
+        <p>Antes, reenviar uma transferência com a mesma chave devolvia <code>409</code>. Para o cliente que caiu num timeout,
+           isso não diz se o dinheiro saiu. Agora:</p>
+        <ul>
+            <li>mesma chave + mesmo conteúdo → <code>200</code> com o <strong>mesmo id</strong> e <code>replay: true</code>;</li>
+            <li>mesma chave + conteúdo diferente → <code>422 IDEMPOTENCY_CONFLICT</code>;</li>
+            <li>a chave é escopada ao usuário: um cliente não "queima" a chave de outro.</li>
+        </ul>
+    </Decisao>
+
+    <Decisao Titulo="Por que isso ainda NÃO é microsserviço">
+        <p>Nada aqui foi dividido. A Fase 0 cria as <strong>condições</strong> para dividir: <code>IUsuarioAtual</code> tira o HTTP da
+           camada Application (o mesmo handler poderá rodar atrás de um consumidor Kafka), e a conta referencia o titular
+           <strong>sem FK</strong>, para que o Identity possa sair com seu próprio banco no capítulo 07.</p>
+    </Decisao>
+
+    <section class="livro-secao livro-lab">
+        <h2>🧪 Lab: prove você mesmo</h2>
+        <ol>
+            <li>Suba o ambiente: <code>cp .env.example .env</code> e <code>docker compose up --build</code>.</li>
+            <li>Rode o teste de concorrência: <code>k6 run tests/carga/double-spend.js</code>.</li>
+            <li>O script deposita R$ 100 e dispara 50 saques simultâneos de R$ 10.
+                <strong>Critério de aprovação:</strong> exatamente 10 saques aceitos, 40 recusados com <code>INSUFFICIENT_FUNDS</code>, saldo final R$ 0,00.</li>
+            <li>Faça <code>git checkout</code> do commit anterior à Fase 0 e rode de novo: veja o saldo ficar negativo ou o extrato divergir.</li>
+            <li>Desafio: comente o <code>if</code> de ordenação em <code>TransferenciaFinanceiraEfCore</code>, dispare transferências cruzadas em paralelo e encontre o deadlock no log.</li>
+        </ol>
+    </section>
+
+    <PerguntaEntrevista Pergunta="Como você evita que dois saques simultâneos deixem a conta negativa?">
+        <p>Não faço "ler saldo, checar e depois debitar", porque entre a leitura e a escrita outro processo pode debitar.
+           Uso um <code>UPDATE ... SET saldo = saldo - @@valor WHERE id = @@id AND saldo &gt;= @@valor</code> e olho quantas linhas foram afetadas.
+           O banco trava a linha e reavalia a condição, então a checagem e o débito são uma operação só. Movimento e chave de
+           idempotência entram na mesma transação, e a execution strategy repete a transação inteira em caso de deadlock.</p>
+    </PerguntaEntrevista>
+
+    <PerguntaEntrevista Pergunta="Te pediram para migrar para microsserviços. Qual é o primeiro passo?">
+        <p>Estabilizar e medir o que existe. Conserto falhas de autorização e de consistência, crio testes de caracterização e
+           observabilidade no monólito. Migrar um sistema com race condition só espalha o bug, e sem métricas eu não consigo
+           provar que o sistema novo está melhor.</p>
+    </PerguntaEntrevista>
+
+    <section class="livro-secao livro-ingles">
+        <h2>🇺🇸 English for Developers</h2>
+        <div class="table-responsive">
+            <table class="bank-table livro-tabela">
+                <thead><tr><th>Term</th><th>Tradução</th></tr></thead>
+                <tbody>
+                    <tr><td>BOLA (Broken Object Level Authorization)</td><td>Autorização quebrada no nível do objeto</td></tr>
+                    <tr><td>Double-spend</td><td>Gasto duplo</td></tr>
+                    <tr><td>Conditional update</td><td>Atualização condicional</td></tr>
+                    <tr><td>Single source of truth</td><td>Fonte única de verdade</td></tr>
+                    <tr><td>Characterization tests</td><td>Testes de caracterização</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p><em>"We never check the balance and then debit it in two steps. The debit itself is the check: a conditional update that only succeeds if the balance is enough."</em></p>
+        <p>Nunca checamos o saldo e debitamos em dois passos. O próprio débito é a checagem: uma atualização condicional que só funciona se o saldo for suficiente.</p>
+    </section>
+
+    <section class="livro-secao livro-checklist">
+        <h2>✅ Critério de pronto do capítulo</h2>
+        <ul>
+            <li>Toda rota financeira exige autenticação; origem e titular vêm do token.</li>
+            <li>Saldo com uma fonte única; depósito, saque e transferência atômicos.</li>
+            <li>Idempotência com replay, conflito e escopo por usuário.</li>
+            <li>Nenhum segredo versionado; nenhum CPF no token.</li>
+            <li>Testes de unidade verdes; teste de concorrência aprovado.</li>
+        </ul>
+    </section>
+
+    <RodapeCapitulo Numero="00" />
+</article>
+
+@code {
+    private const string DiagramaRace =
+"""
+sequenceDiagram
+    autonumber
+    participant A as Saque A (R$ 100)
+    participant DB as Banco (saldo R$ 100)
+    participant B as Saque B (R$ 100)
+    Note over A,B: ANTES: checar, inserir, recalcular
+    A->>DB: SELECT saldo → 100 ✔
+    B->>DB: SELECT saldo → 100 ✔
+    A->>DB: INSERT movimento D 100
+    B->>DB: INSERT movimento D 100
+    Note over DB: saldo = -100 ❌
+    Note over A,B: DEPOIS: UPDATE condicional
+    A->>DB: UPDATE ... WHERE saldo >= 100 → 1 linha ✔
+    B->>DB: UPDATE ... WHERE saldo >= 100 → 0 linhas
+    DB-->>B: 422 INSUFFICIENT_FUNDS
+""";
+
+    private const string CodigoAntes =
+"""
+if (request.Tipo == "D" && conta.Saldo < request.Valor)   // 1. lê e checa
+    throw new InvalidOperationException("Saldo insuficiente...");
+
+await _movimentoRepo.AdicionarAsync(movimento);           // 2. grava (SaveChanges próprio)
+
+var novoSaldo = await _movimentoRepo.CalcularSaldoAsync(conta.Id);
+await _contaRepo.AtualizarSaldoAsync(conta.Id, novoSaldo); // 3. recalcula e grava de novo
+""";
+
+    private const string CodigoDepois =
+"""
+await using var transacao = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+var linhas = await _context.ContasCorrente
+    .Where(x => x.Id == idConta && x.Ativo && x.Saldo >= valor)   // a checagem É o update
+    .ExecuteUpdateAsync(set => set
+        .SetProperty(x => x.Saldo, x => x.Saldo - valor)
+        .SetProperty(x => x.AtualizadoEm, agora), ct);
+
+if (linhas == 0)
+    throw await DiagnosticoDeConta.ExplicarFalhaAsync(_context, idConta, "movimentação", ct);
+
+var movimento = Movimento.CriarDebito(idConta, valor, chave, descricao);
+_context.Movimentos.Add(movimento);
+_context.Idempotencias.Add(new Idempotencia(chave, requisicao, movimento.Id.ToString()));
+
+await _context.SaveChangesAsync(ct);
+await transacao.CommitAsync(ct);
+""";
+}

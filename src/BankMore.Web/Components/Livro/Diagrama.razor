@@ -1,0 +1,28 @@
+@inject IJSRuntime JS
+
+<figure class="livro-diagrama">
+    <figcaption>📊 @Titulo</figcaption>
+    <div @ref="_alvo" class="livro-diagrama-corpo">
+        <pre class="livro-diagrama-fonte">@Definicao</pre>
+    </div>
+</figure>
+
+@code {
+    [Parameter] public string Titulo { get; set; } = "Diagrama";
+    [Parameter] public string Definicao { get; set; } = "";
+
+    private ElementReference _alvo;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            await JS.InvokeVoidAsync("livro.renderizarMermaid", _alvo, Definicao);
+        }
+        catch (JSException)
+        {
+            // Sem a lib do Mermaid (offline), o texto-fonte do diagrama continua visível.
+        }
+    }
+}
