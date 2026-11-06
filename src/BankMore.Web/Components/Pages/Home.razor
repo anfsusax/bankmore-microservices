@@ -278,7 +278,7 @@
         StateHasChanged();
         try
         {
-            var novoSaldo = await ApiClient.ObterSaldoAsync(Session.ContaId, Session.NumeroConta);
+            var novoSaldo = await ApiClient.ObterSaldoAsync(Session.Token);
             Session.AtualizarSaldo(novoSaldo);
         }
         finally

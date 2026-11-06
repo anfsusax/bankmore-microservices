@@ -1,0 +1,10 @@
+<aside class="livro-analogia">
+    <div class="livro-analogia-titulo"><span>@Emoji</span> Analogia: @Titulo</div>
+    @ChildContent
+</aside>
+
+@code {
+    [Parameter] public string Emoji { get; set; } = "💡";
+    [Parameter] public string Titulo { get; set; } = "";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -32,16 +32,11 @@ namespace BankMore.Auth.API.Controllers
                 var usuario = await _usuarioRepo.ObterPorCpfAsync(command.DocumentoOuConta)
                              ?? await _usuarioRepo.ObterPorEmailAsync(command.DocumentoOuConta);
 
-                ContaCorrente? conta = null;
-                if (usuario != null)
-                {
-                    conta = await _contaRepo.ObterPorNomeAsync(usuario.Nome);
-                }
-
-                if (conta == null && int.TryParse(command.DocumentoOuConta, out int numConta))
-                {
-                    conta = await _contaRepo.ObterPorNumeroAsync(numConta);
-                }
+                // A conta é localizada pelo vínculo com o titular (idusuario).
+                // Antes era pelo NOME: dois clientes homônimos enxergavam a conta um do outro.
+                ContaCorrente? conta = usuario is null
+                    ? null
+                    : await _contaRepo.ObterPorUsuarioAsync(usuario.Id);
 
                 return Ok(new
                 {

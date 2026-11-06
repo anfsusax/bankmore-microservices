@@ -1,0 +1,15 @@
+<div class="livro-grid-2">
+    <div class="livro-card livro-problema">
+        <div class="livro-tag vermelho">❌ O problema</div>
+        @Problema
+    </div>
+    <div class="livro-card livro-objetivo">
+        <div class="livro-tag verde">🎯 O objetivo</div>
+        @Objetivo
+    </div>
+</div>
+
+@code {
+    [Parameter] public RenderFragment? Problema { get; set; }
+    [Parameter] public RenderFragment? Objetivo { get; set; }
+}

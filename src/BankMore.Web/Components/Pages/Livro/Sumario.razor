@@ -1,0 +1,55 @@
+@page "/livro"
+@using BankMore.Web.Livro
+
+<PageTitle>Livro do Laboratório — BankMore</PageTitle>
+
+<div class="livro">
+    <header class="livro-capa">
+        <div class="livro-numero">LIVRO DO LABORATÓRIO</div>
+        <h1>Migrar ou não migrar?</h1>
+        <p class="livro-pergunta">
+            O BankMore nasceu monólito. Este livro conta, capítulo a capítulo, o que foi migrado para microsserviços,
+            o que <strong>de propósito</strong> ficou num monólito modular, e por quê.
+        </p>
+        <div class="livro-legenda">
+            <SeloEstilo Estilo="EstiloArquitetura.Fundamento" />
+            <SeloEstilo Estilo="EstiloArquitetura.MonolitoModular" />
+            <SeloEstilo Estilo="EstiloArquitetura.Microsservico" />
+            <SeloEstilo Estilo="EstiloArquitetura.Prova" />
+        </div>
+    </header>
+
+    <Analogia Emoji="🏦" Titulo="o cenário de todo capítulo">
+        <p>A empresa chega e diz: <em>"Alex, queremos migrar esse sistema bancário para microsserviços."</em>
+           Cada capítulo responde uma pergunta que você ouviria nessa reunião, com o código do BankMore como prova.</p>
+    </Analogia>
+
+    @foreach (var parte in CatalogoDoLivro.Capitulos.GroupBy(c => c.Parte))
+    {
+        <section class="livro-parte-bloco">
+            <h2>Parte @parte.Key</h2>
+            <div class="livro-lista">
+                @foreach (var cap in parte)
+                {
+                    var disponivel = cap.Status != StatusCapitulo.Planejado;
+                    <a class="livro-item @(disponivel ? "" : "livro-item-planejado")" href="@(disponivel ? cap.Rota : null)">
+                        <span class="livro-item-numero">@cap.Numero</span>
+                        <span class="livro-item-texto">
+                            <strong>@cap.Titulo</strong>
+                            <small>@cap.Pergunta</small>
+                        </span>
+                        <span class="livro-item-lado">
+                            <SeloEstilo Estilo="cap.Estilo" />
+                            <span class="livro-status">@(cap.Status switch
+                            {
+                                StatusCapitulo.Escrito => "✅ escrito",
+                                StatusCapitulo.EmAndamento => "🚧 em andamento",
+                                _ => "🗓️ planejado"
+                            })</span>
+                        </span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+</div>

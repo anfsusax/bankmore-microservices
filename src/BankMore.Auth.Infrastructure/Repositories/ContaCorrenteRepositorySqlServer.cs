@@ -64,6 +64,14 @@ namespace BankMore.Auth.Infrastructure.Repositories
             );
         }
 
+        public async Task<ContaCorrente?> ObterPorUsuarioAsync(Guid idUsuario)
+        {
+            // Repositório Dapper legado (não registrado na DI). Mantido compilando para o comparativo EF x Dapper.
+            var sql = @"SELECT numero FROM contacorrente WHERE idusuario = @IdUsuario";
+            var numero = await _connection.QueryFirstOrDefaultAsync<int?>(sql, new { IdUsuario = idUsuario });
+            return numero is null ? null : await ObterPorNumeroAsync(numero.Value);
+        }
+
         public async Task<ContaCorrente?> ObterPorNumeroAsync(int numero)
         {
             var sql = @"SELECT idcontacorrente as Id, numero as Numero, nome as Nome, 

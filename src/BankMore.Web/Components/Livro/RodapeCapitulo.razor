@@ -1,0 +1,18 @@
+@using BankMore.Web.Livro
+
+<nav class="livro-rodape">
+    <a href="livro" class="btn-secondary-bank text-decoration-none"><i class="fa-solid fa-list"></i> Sumário</a>
+    @if (_proximo is not null)
+    {
+        <div class="livro-proximo">
+            <small>Próximo capítulo @(_proximo.Status == StatusCapitulo.Planejado ? "(planejado)" : "")</small>
+            <strong>@_proximo.Numero · @_proximo.Titulo</strong>
+        </div>
+    }
+</nav>
+
+@code {
+    [Parameter, EditorRequired] public string Numero { get; set; } = "";
+    private Capitulo? _proximo;
+    protected override void OnParametersSet() => _proximo = CatalogoDoLivro.Proximo(Numero);
+}

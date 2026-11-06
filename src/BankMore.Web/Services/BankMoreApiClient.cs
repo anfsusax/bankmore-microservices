@@ -141,7 +141,8 @@ namespace BankMore.Web.Services
             }
         }
 
-        public async Task<ApiResponse<Guid>> CriarContaCorrenteAsync(CriarContaModel model)
+        /// <summary>Abre a conta do usuário autenticado: o titular vem do token, então o login vem antes.</summary>
+        public async Task<ApiResponse<Guid>> CriarContaCorrenteAsync(CriarContaModel model, string token)
         {
             try
             {
@@ -152,8 +153,12 @@ namespace BankMore.Web.Services
                     senha = model.Senha
                 };
 
-                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("/api/contacorrente", content);
+                using var request = new HttpRequestMessage(HttpMethod.Post, "/api/contacorrente")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                };
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                var response = await _httpClient.SendAsync(request);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -163,7 +168,7 @@ namespace BankMore.Web.Services
                     if (doc.RootElement.TryGetProperty("id", out var idProp) || doc.RootElement.TryGetProperty("Id", out idProp))
                         contaIdStr = idProp.GetString();
 
-                    var contaId = Guid.TryParse(contaIdStr, out var parsedId) ? parsedId : Guid.NewGuid();
+                    var contaId = Guid.TryParse(contaIdStr, out var parsedId) ? parsedId : Guid.Empty;
 
                     return new ApiResponse<Guid>
                     {
@@ -186,57 +191,47 @@ namespace BankMore.Web.Services
             }
         }
 
-        public async Task<decimal> ObterSaldoAsync(Guid contaId, int? numeroConta = null)
+        /// <summary>
+        /// Conta e saldo do usuário autenticado (GET /api/contacorrente/minha).
+        /// As rotas públicas de saldo por id/número foram removidas da API: expunham o saldo de qualquer conta.
+        /// </summary>
+        public async Task<ContaInfoDto?> ObterMinhaContaAsync(string token)
         {
+            if (string.IsNullOrWhiteSpace(token))
+                return null;
+
             try
             {
-                if (contaId != Guid.Empty)
-                {
-                    var response = await _httpClient.GetAsync($"/api/contacorrente/contas/{contaId}/saldo");
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var content = await response.Content.ReadAsStringAsync();
-                        if (decimal.TryParse(content.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var saldo))
-                        {
-                            return saldo;
-                        }
-                    }
-                }
+                using var request = new HttpRequestMessage(HttpMethod.Get, "/api/contacorrente/minha");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-                if (numeroConta.HasValue && numeroConta.Value > 0)
+                var response = await _httpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                return new ContaInfoDto
                 {
-                    return await ObterSaldoPorNumeroAsync(numeroConta.Value);
-                }
+                    Id = root.TryGetProperty("idConta", out var id) && Guid.TryParse(id.GetString(), out var g) ? g : Guid.Empty,
+                    Numero = root.TryGetProperty("numero", out var n) ? n.GetInt32() : 0,
+                    Nome = root.TryGetProperty("nome", out var nome) ? nome.GetString() ?? string.Empty : string.Empty,
+                    Saldo = root.TryGetProperty("saldo", out var s) ? s.GetDecimal() : 0m,
+                    Ativo = root.TryGetProperty("ativo", out var a) && a.GetBoolean()
+                };
             }
             catch
             {
-                // Fallback
+                return null;
             }
-            return 0m;
         }
 
-        public async Task<decimal> ObterSaldoPorNumeroAsync(int numeroConta)
+        public async Task<decimal> ObterSaldoAsync(string token)
         {
-            try
-            {
-                if (numeroConta > 0)
-                {
-                    var response = await _httpClient.GetAsync($"/api/contacorrente/contas/numero/{numeroConta}/saldo");
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var content = await response.Content.ReadAsStringAsync();
-                        if (decimal.TryParse(content.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var saldo))
-                        {
-                            return saldo;
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // Fallback
-            }
-            return 0m;
+            var conta = await ObterMinhaContaAsync(token);
+            return conta?.Saldo ?? 0m;
         }
 
         public async Task<ApiResponse<bool>> MovimentarContaAsync(MovimentoModel model, string token)

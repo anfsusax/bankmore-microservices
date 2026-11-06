@@ -128,7 +128,7 @@
 
     private async Task CarregarSaldo()
     {
-        var saldoAtual = await ApiClient.ObterSaldoAsync(Session.ContaId, Session.NumeroConta);
+        var saldoAtual = await ApiClient.ObterSaldoAsync(Session.Token);
         Session.AtualizarSaldo(saldoAtual);
     }
 

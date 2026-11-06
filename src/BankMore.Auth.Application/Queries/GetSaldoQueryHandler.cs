@@ -1,47 +1,39 @@
-﻿using BankMore.Auth.Domain.Repositories;
+using BankMore.Auth.Application.Abstractions;
+using BankMore.Auth.Domain.Exceptions;
+using BankMore.Auth.Domain.Repositories;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 
 namespace BankMore.Auth.Application.Queries
 {
+    /// <summary>Saldo da conta do usuário autenticado. Não existe mais consulta de saldo de terceiros.</summary>
     public class GetSaldoQueryHandler : IRequestHandler<GetSaldoQuery, SaldoResult>
     {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-        private readonly IContaCorrenteRepository _contaRepo;
-        private readonly IMovimentoRepository _movimentoRepo;
+        private readonly IUsuarioAtual _usuarioAtual;
+        private readonly IContaCorrenteRepository _contas;
 
-        public GetSaldoQueryHandler(
-            IHttpContextAccessor httpContextAccessor,
-            IContaCorrenteRepository contaRepo,
-            IMovimentoRepository movimentoRepo)
+        public GetSaldoQueryHandler(IUsuarioAtual usuarioAtual, IContaCorrenteRepository contas)
         {
-            _httpContextAccessor = httpContextAccessor;
-            _contaRepo = contaRepo;
-            _movimentoRepo = movimentoRepo;
+            _usuarioAtual = usuarioAtual;
+            _contas = contas;
         }
 
         public async Task<SaldoResult> Handle(GetSaldoQuery request, CancellationToken cancellationToken)
         {
-            var userId = _httpContextAccessor.HttpContext?.User?.FindFirst("id")?.Value;
+            var idUsuario = _usuarioAtual.ObterIdUsuario();
 
-            if (userId == null || !Guid.TryParse(userId, out var contaId))
-                throw new UnauthorizedAccessException("Token inválido.");
+            var conta = await _contas.ObterPorUsuarioAsync(idUsuario)
+                ?? throw new RecursoNaoEncontradoException("INVALID_ACCOUNT", "O usuário autenticado não possui conta corrente.");
 
-            var conta = await _contaRepo.ObterPorIdAsync(contaId);
-            if (conta == null)
-                throw new Exception("Conta não encontrada. TIPO: INVALID_ACCOUNT");
-
-            if (!conta.Ativo)
-                throw new Exception("Conta inativa. TIPO: INACTIVE_ACCOUNT");
-
-            var saldo = await _movimentoRepo.CalcularSaldoAsync(contaId);
-
+            // Fonte única de verdade: o saldo materializado, atualizado na mesma transação do movimento.
+            // Antes, cada endpoint lia de um lugar (coluna x SUM dos movimentos) e os valores divergiam.
             return new SaldoResult
             {
+                IdConta = conta.Id,
                 Numero = conta.Numero,
                 Nome = conta.Nome,
+                Ativo = conta.Ativo,
                 DataHora = DateTime.UtcNow,
-                Saldo = saldo
+                Saldo = conta.Saldo
             };
         }
     }

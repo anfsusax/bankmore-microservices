@@ -1,37 +1,33 @@
-﻿using BankMore.Auth.Domain.Repositories;
+using BankMore.Auth.Application.Abstractions;
+using BankMore.Auth.Domain.Exceptions;
+using BankMore.Auth.Domain.Repositories;
 using MediatR;
-using Microsoft.AspNetCore.Http;
 
 namespace BankMore.Auth.Application.Commands
 {
     public class InativarContaCommandHandler : IRequestHandler<InativarContaCommand, Unit>
     {
         private readonly IContaCorrenteRepository _repository;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUsuarioAtual _usuarioAtual;
 
-        public InativarContaCommandHandler(IContaCorrenteRepository repository, IHttpContextAccessor httpContextAccessor)
+        public InativarContaCommandHandler(IContaCorrenteRepository repository, IUsuarioAtual usuarioAtual)
         {
             _repository = repository;
-            _httpContextAccessor = httpContextAccessor;
+            _usuarioAtual = usuarioAtual;
         }
 
         public async Task<Unit> Handle(InativarContaCommand request, CancellationToken cancellationToken)
         {
-            var userId = _httpContextAccessor.HttpContext?.User?.FindFirst("id")?.Value;
- 
-            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var contaId))
-                throw new UnauthorizedAccessException();
+            var idUsuario = _usuarioAtual.ObterIdUsuario();
 
-            var conta = await _repository.ObterPorIdAsync(contaId);
-            if (conta is null)
-                throw new ArgumentException("Conta não encontrada", "INVALID_ACCOUNT");
+            var conta = await _repository.ObterPorUsuarioAsync(idUsuario)
+                ?? throw new RecursoNaoEncontradoException("INVALID_ACCOUNT", "Conta não encontrada.");
 
             if (!conta.Ativo)
-                throw new ArgumentException("Conta já está inativa", "INACTIVE_ACCOUNT");
+                throw new RegraDeNegocioException("INACTIVE_ACCOUNT", "Conta já está inativa.");
 
-            var hashInformado = BCrypt.Net.BCrypt.HashPassword(request.Senha + conta.Salt);
             if (!BCrypt.Net.BCrypt.Verify(request.Senha + conta.Salt, conta.Senha))
-                throw new ArgumentException("Senha incorreta", "INVALID_PASSWORD");
+                throw new UnauthorizedAccessException("Senha incorreta.");
 
             conta.Inativar();
             await _repository.AtualizarAsync(conta);

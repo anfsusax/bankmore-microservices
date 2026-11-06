@@ -38,6 +38,13 @@ namespace BankMore.Auth.Infrastructure.Repositories
                 .FirstOrDefaultAsync(c => c.Numero == numero);
         }
 
+        public async Task<ContaCorrente?> ObterPorUsuarioAsync(Guid idUsuario)
+        {
+            return await _context.ContasCorrente
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.IdUsuario == idUsuario);
+        }
+
         public async Task AtualizarSaldoAsync(Guid idConta, decimal novoSaldo)
         {
             var conta = await ObterPorIdAsync(idConta);

@@ -1,0 +1,16 @@
+@using BankMore.Web.Livro
+
+<header class="livro-cabecalho">
+    <a href="livro" class="livro-voltar"><i class="fa-solid fa-arrow-left"></i> Sumário</a>
+    <div class="livro-meta">
+        <span class="livro-parte">Parte @Capitulo.Parte</span>
+        <SeloEstilo Estilo="Capitulo.Estilo" />
+    </div>
+    <div class="livro-numero">CAPÍTULO @Capitulo.Numero</div>
+    <h1>@Capitulo.Titulo</h1>
+    <p class="livro-pergunta">@Capitulo.Pergunta</p>
+</header>
+
+@code {
+    [Parameter, EditorRequired] public Capitulo Capitulo { get; set; } = default!;
+}

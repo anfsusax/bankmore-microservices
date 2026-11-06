@@ -1,0 +1,23 @@
+@using BankMore.Web.Livro
+
+<span class="livro-selo @Classe">@Texto</span>
+
+@code {
+    [Parameter] public EstiloArquitetura Estilo { get; set; }
+
+    private string Classe => Estilo switch
+    {
+        EstiloArquitetura.MonolitoModular => "selo-modular",
+        EstiloArquitetura.Microsservico => "selo-micro",
+        EstiloArquitetura.Prova => "selo-prova",
+        _ => "selo-fundamento"
+    };
+
+    private string Texto => Estilo switch
+    {
+        EstiloArquitetura.MonolitoModular => "🧱 Monólito modular",
+        EstiloArquitetura.Microsservico => "🧩 Microsserviço",
+        EstiloArquitetura.Prova => "🧪 Prova",
+        _ => "📐 Fundamento"
+    };
+}
