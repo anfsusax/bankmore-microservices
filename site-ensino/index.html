@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Escola BankMore | Migrar ou não migrar para microsserviços</title>
+  <meta name="description" content="Livro do laboratório BankMore: como um sistema bancário em .NET 10 decide o que vira microsserviço e o que fica num monólito modular. Concorrência, idempotência, Strangler Fig, Outbox, Circuit Breaker, Saga do PIX e LGPD.">
+  <meta name="theme-color" content="#0b1f4b">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Mermaid para os fluxogramas (versão fixa) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+  <a href="#main-content" class="skip-link">Pular para o conteúdo</a>
+  <div class="bank-ribbon"></div>
+
+  <header class="top-nav">
+    <div class="nav-container">
+      <button id="menu-toggle" class="btn-icon menu-toggle" aria-label="Abrir trilha de estudos" aria-expanded="false">☰</button>
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">🏦</div>
+        <div class="brand-text">
+          <span class="brand-title">Escola BankMore</span>
+          <span class="brand-subtitle">Migrar ou não migrar? .NET 10 · PostgreSQL · Kafka · PIX</span>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="module-search" placeholder="Buscar conceito (ex: double-spend, PIX, Outbox, LGPD)..." aria-label="Buscar conceitos">
+        <span id="search-results" class="search-results" role="status" aria-live="polite"></span>
+      </div>
+
+      <div class="nav-actions">
+        <button id="theme-toggle" class="btn-icon" title="Alternar para modo escuro" aria-label="Alternar tema" aria-pressed="false">
+          <span id="theme-icon">🌙</span>
+        </button>
+        <a href="#simuladores" class="btn-lab-quick">🎮 Laboratório</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h3>📚 Trilha do Livro</h3>
+        <p class="progress-label">Leitura da página: <span id="progress-percent">0%</span></p>
+        <div class="progress-bar-container">
+          <div class="progress-bar" id="progress-bar-fill" role="progressbar" aria-label="Leitura da página" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navegação do livro">
+        <a href="#intro" class="nav-item active" data-target="intro"><span class="step-badge">0</span><span>Visão geral</span></a>
+
+        <div class="sidebar-group">Parte I · Antes de migrar</div>
+        <a href="#m-estabilizar" class="nav-item" data-target="m-estabilizar"><span class="step-badge">1</span><span>Estabilizar antes de migrar</span><span class="nav-dot feito" title="Implementado"></span></a>
+        <a href="#m-migrar" class="nav-item" data-target="m-migrar"><span class="step-badge">2</span><span>Migrar ou não migrar?</span><span class="nav-dot feito" title="Decidido (ADR-001)"></span></a>
+        <a href="#m-contextos" class="nav-item" data-target="m-contextos"><span class="step-badge">3</span><span>Os contextos de um banco</span><span class="nav-dot planejado" title="Planejado"></span></a>
+
+        <div class="sidebar-group">Parte II · Por que NÃO migrou</div>
+        <a href="#m-ledger" class="nav-item" data-target="m-ledger"><span class="step-badge">4</span><span>Saldo, ledger e concorrência</span><span class="nav-dot feito" title="Implementado"></span></a>
+        <a href="#m-idempotencia" class="nav-item" data-target="m-idempotencia"><span class="step-badge">5</span><span>Idempotência bancária</span><span class="nav-dot feito" title="Implementado"></span></a>
+        <a href="#m-modular" class="nav-item" data-target="m-modular"><span class="step-badge">6</span><span>Monólito modular</span><span class="nav-dot planejado" title="Planejado"></span></a>
+
+        <div class="sidebar-group">Parte III · Por que migrou</div>
+        <a href="#m-gateway" class="nav-item" data-target="m-gateway"><span class="step-badge">7</span><span>Gateway e Strangler Fig</span><span class="nav-dot planejado" title="Planejado"></span></a>
+        <a href="#m-comunicacao" class="nav-item" data-target="m-comunicacao"><span class="step-badge">8</span><span>Síncrono x assíncrono</span><span class="nav-dot planejado" title="Planejado"></span></a>
+        <a href="#m-outbox" class="nav-item" data-target="m-outbox"><span class="step-badge">9</span><span>Outbox + Kafka: tarifas</span><span class="nav-dot planejado" title="Planejado"></span></a>
+        <a href="#m-circuit" class="nav-item" data-target="m-circuit"><span class="step-badge">10</span><span>Circuit Breaker no SPI</span><span class="nav-dot planejado" title="Planejado"></span></a>
+        <a href="#m-saga" class="nav-item" data-target="m-saga"><span class="step-badge">11</span><span>A saga do PIX</span><span class="nav-dot planejado" title="Planejado"></span></a>
+        <a href="#m-observabilidade" class="nav-item" data-target="m-observabilidade"><span class="step-badge">12</span><span>Observabilidade com LGPD</span><span class="nav-dot planejado" title="Planejado"></span></a>
+
+        <div class="sidebar-group">Parte IV · Prova</div>
+        <a href="#m-k6" class="nav-item" data-target="m-k6"><span class="step-badge">13</span><span>Carga e concorrência (k6)</span><span class="nav-dot feito" title="Implementado"></span></a>
+        <a href="#m-tutorial" class="nav-item" data-target="m-tutorial"><span class="step-badge">🛠️</span><span>Rodando o BankMore</span></a>
+        <a href="#simuladores" class="nav-item" data-target="simuladores"><span class="step-badge">🎮</span><span>Laboratório interativo</span></a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="mini-card-info">
+          <span class="dot-online"></span>
+          <span>Bolinha verde = já implementado no BankMore. Cinza = capítulo planejado (o conceito já está explicado aqui).</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content-area" id="main-content">
+
+      <!-- ===================== HERO ===================== -->
+      <section id="intro" class="section-card hero-section">
+        <div class="hero-badge">🏦 Laboratório bancário · Didática passo a passo</div>
+        <h1 class="hero-title">Migrar ou não migrar para microsserviços?</h1>
+        <p class="hero-desc">
+          A empresa chega e diz: <em>"Alex, queremos migrar nosso sistema bancário para microsserviços."</em>
+          Este livro responde essa reunião usando um banco de verdade em código: o <strong>BankMore</strong>.
+          Você vai ver o que foi para microsserviços, o que <strong>de propósito</strong> ficou num monólito modular,
+          e o porquê de cada decisão, com problema, analogia, fluxograma, código e prova.
+        </p>
+
+        <div class="hero-stats-grid">
+          <div class="stat-card"><span class="stat-number">50 → 10</span><span class="stat-text">saques simultâneos de R$ 10 sobre R$ 100: só 10 aceitos, saldo final R$ 0,00</span></div>
+          <div class="stat-card"><span class="stat-number">24 → 0</span><span class="stat-text">erros 500 em 40 transferências cruzadas depois de ordenar os locks</span></div>
+          <div class="stat-card"><span class="stat-number">47</span><span class="stat-text">testes de unidade verdes no núcleo</span></div>
+          <div class="stat-card"><span class="stat-number">2 estilos</span><span class="stat-text">monólito modular no núcleo + microsserviços nas bordas</span></div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">
+            <strong>Como cada módulo funciona:</strong>
+            <code>Problema ➜ Objetivo ➜ Exemplo do dia a dia ➜ Passo a passo ➜ Fluxograma ➜ Código ➜ Decisão ➜ Entrevista ➜ English for Developers</code>.
+            Os módulos com bolinha verde já estão implementados e provados no BankMore; os demais explicam o conceito e mostram o código-alvo do próximo capítulo.
+          </div>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <div class="infographic-card" style="margin:0">
+          <div class="infographic-header">
+            <span class="infographic-title">🎨 Infográfico: a arquitetura-alvo do BankMore</span>
+            <span class="badge-tag blue">Híbrida de propósito</span>
+          </div>
+          <div class="infographic-frame">
+            <svg viewBox="0 0 960 400" role="img" aria-label="Arquitetura híbrida: gateway na frente, núcleo modular no centro e microsserviços nas bordas conectados por Kafka">
+              <defs>
+                <marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker>
+              </defs>
+              <!-- cliente e gateway -->
+              <rect x="20" y="170" width="120" height="60" rx="12" class="svg-caixa"/>
+              <text x="80" y="198" text-anchor="middle" class="svg-texto" font-size="22">📱</text>
+              <text x="80" y="220" text-anchor="middle" class="svg-texto" font-size="13" font-weight="700">Cliente</text>
+              <line x1="140" y1="200" x2="190" y2="200" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <rect x="195" y="150" width="130" height="100" rx="14" fill="#1d4ed8"/>
+              <text x="260" y="190" text-anchor="middle" fill="#fff" font-size="22">🚪</text>
+              <text x="260" y="214" text-anchor="middle" fill="#fff" font-size="14" font-weight="800">Gateway</text>
+              <text x="260" y="232" text-anchor="middle" fill="#dbeafe" font-size="11">YARP · JWT · rate limit</text>
+
+              <!-- núcleo modular -->
+              <rect x="390" y="120" width="230" height="160" rx="18" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+              <text x="505" y="146" text-anchor="middle" fill="#92400e" font-size="13" font-weight="800">🧱 NÚCLEO · MONÓLITO MODULAR</text>
+              <rect x="408" y="160" width="92" height="50" rx="10" fill="#fff" stroke="#d97706"/>
+              <text x="454" y="190" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="700">Contas</text>
+              <rect x="510" y="160" width="92" height="50" rx="10" fill="#fff" stroke="#d97706"/>
+              <text x="556" y="183" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="700">Transferência</text>
+              <text x="556" y="199" text-anchor="middle" fill="#0f172a" font-size="11">interna</text>
+              <rect x="408" y="220" width="194" height="44" rx="10" fill="#fff" stroke="#d97706"/>
+              <text x="505" y="247" text-anchor="middle" fill="#0f172a" font-size="12" font-weight="700">Ledger · 1 transação ACID</text>
+
+              <!-- microsserviços -->
+              <rect x="390" y="20" width="230" height="70" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="505" y="50" text-anchor="middle" fill="#5b21b6" font-size="13" font-weight="800">🧩 Identity</text>
+              <text x="505" y="70" text-anchor="middle" fill="#5b21b6" font-size="11">usuários · emite JWT · banco próprio</text>
+              <rect x="390" y="310" width="230" height="70" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="505" y="340" text-anchor="middle" fill="#5b21b6" font-size="13" font-weight="800">🧩 PIX (saga)</text>
+              <text x="505" y="360" text-anchor="middle" fill="#5b21b6" font-size="11">bloqueio · liquidação · estorno</text>
+              <rect x="700" y="310" width="120" height="70" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="760" y="340" text-anchor="middle" fill="#5b21b6" font-size="13" font-weight="800">SPI Simulado</text>
+              <text x="760" y="360" text-anchor="middle" fill="#5b21b6" font-size="11">⚡ circuit breaker</text>
+              <rect x="840" y="310" width="105" height="70" rx="14" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="892" y="350" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="800">Antifraude</text>
+
+              <!-- kafka e workers -->
+              <rect x="700" y="160" width="110" height="80" rx="40" fill="#0b1f4b"/>
+              <text x="755" y="196" text-anchor="middle" fill="#fff" font-size="14" font-weight="800">Kafka</text>
+              <text x="755" y="214" text-anchor="middle" fill="#99f6e4" font-size="11">eventos</text>
+              <rect x="840" y="120" width="105" height="60" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="892" y="155" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="800">Tarifas</text>
+              <rect x="840" y="210" width="105" height="60" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+              <text x="892" y="245" text-anchor="middle" fill="#5b21b6" font-size="12" font-weight="800">Notificações</text>
+
+              <!-- setas -->
+              <line x1="325" y1="185" x2="385" y2="185" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <line x1="300" y1="150" x2="390" y2="70" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <line x1="300" y1="250" x2="390" y2="330" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <line x1="505" y1="310" x2="505" y2="285" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <line x1="620" y1="345" x2="695" y2="345" stroke="#64748b" stroke-width="2" marker-end="url(#seta)"/>
+              <path d="M620,330 C700,300 820,300 860,308" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#seta)"/>
+              <line x1="620" y1="200" x2="695" y2="200" stroke="#0e9f8e" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#seta)"/>
+              <text x="657" y="192" text-anchor="middle" class="svg-muted" font-size="10">Outbox</text>
+              <line x1="810" y1="185" x2="838" y2="160" stroke="#0e9f8e" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#seta)"/>
+              <line x1="810" y1="215" x2="838" y2="238" stroke="#0e9f8e" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#seta)"/>
+            </svg>
+          </div>
+          <div class="infographic-caption">
+            <strong>👁️ Entendendo a imagem:</strong>
+            <br>1. <strong>Amarelo (fica):</strong> Contas, ledger e transferência interna mudam o saldo juntos numa única transação. Separar exigiria saga para algo que hoje é atômico.
+            <br>2. <strong>Roxo (sai):</strong> só vira microsserviço o que tem motivo concreto: fronteira clara (Identity), reação a eventos (Tarifas, Notificações) ou sistema externo que falha sozinho (PIX, SPI, Antifraude).
+            <br>3. <strong>Tracejado verde:</strong> eventos saem do banco pelo <em>Outbox</em> e chegam aos workers pelo Kafka, sem travar a transferência.
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 1 ===================== -->
+      <section id="m-estabilizar" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 1</span><span class="estilo-pill fundamento">📐 Fundamento</span><span class="status-pill feito">✅ Implementado</span></div>
+          <h2>Estabilizar antes de migrar</h2>
+          <p class="module-subtitle">"Alex, migra pra microsserviços." O primeiro passo não é dividir: é consertar e medir.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>Primeiro dia no projeto. Antes de desenhar qualquer serviço, você lê o código do BankMore e em menos de uma hora encontra
+              <strong>seis falhas</strong>. Nenhuma é "de arquitetura": todas fazem um banco perder dinheiro ou vazar dados.</p>
+            <p class="sub-alert">Migrar um sistema assim <strong>multiplica</strong> o problema: a race condition que hoje vive num processo passa a viver em cinco serviços, com rede no meio e logs espalhados.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Deixar o monólito <strong>correto e mensurável</strong>: autorização certa, saldo com uma única fonte de verdade,
+              operações atômicas e testes que provam isso.</p>
+            <p class="sub-alert">Só depois disso ele vira uma base segura para a migração. É a "Fase 0" de qualquer projeto sério.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🏚️</span><h3>Exemplo do Dia a Dia: mudança de prédio com vazamento de gás</h3></div>
+          <p>Ninguém muda os moradores de um prédio com vazamento de gás para um condomínio novo levando os mesmos canos.</p>
+          <ul>
+            <li>Primeiro você <strong>fecha o registro</strong> (corrige as falhas graves).</li>
+            <li>Depois <strong>instala medidores</strong> (testes e observabilidade) para saber o consumo de verdade.</li>
+            <li>Só então planeja a mudança (a migração), sabendo comparar o antes e o depois.</li>
+          </ul>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">1️⃣</span><h4>As seis falhas encontradas no BankMore</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th style="width:4%">#</th><th style="width:22%">Falha</th><th style="width:37%">Como alguém explorava</th><th style="width:37%">O que fizemos</th></tr></thead>
+            <tbody>
+              <tr><td><strong>1</strong></td><td><strong>BOLA</strong> na transferência (OWASP API1)</td><td>Sem login, mandar <code>IdContaOrigem</code> de outra pessoa no corpo do <code>POST /api/transferencias</code>.</td><td><code>[Authorize]</code> e origem resolvida a partir do token, nunca do corpo.</td></tr>
+              <tr><td><strong>2</strong></td><td>Saque em conta de terceiro</td><td>Logado, enviar <code>NumeroConta</code> de outra conta com tipo <code>D</code>.</td><td>Débito só na conta do titular (403). Depósito em terceiro continua permitido.</td></tr>
+              <tr><td><strong>3</strong></td><td>Conta encontrada <strong>pelo nome</strong></td><td>Dois clientes homônimos: um loga e enxerga a conta do outro.</td><td>Coluna <code>idusuario</code> com índice único, sem FK (ADR-002).</td></tr>
+              <tr><td><strong>4</strong></td><td><strong>Double-spend</strong> no saque</td><td>Dois saques de R$ 100 ao mesmo tempo com saldo de R$ 100: os dois passam.</td><td>UPDATE condicional + movimento + idempotência na mesma transação (módulo 4).</td></tr>
+              <tr><td><strong>5</strong></td><td>Duas fontes de saldo</td><td><code>/api/movimentos</code> gravava movimento sem mexer no saldo. Cada tela mostrava um valor.</td><td>Endpoint removido; o saldo materializado virou a fonte única.</td></tr>
+              <tr><td><strong>6</strong></td><td>Dados sensíveis expostos</td><td>CPF dentro do JWT, senha do banco e chave JWT no repositório, saldo público por número de conta.</td><td>Claims mínimas, segredos em <code>.env</code>/user-secrets, consultas só da própria conta.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Fluxograma: a ordem certa de uma migração</h4></div>
+          <div class="mermaid">
+flowchart LR
+  A[Monólito com falhas] --> B[Fase 0<br/>corrigir segurança<br/>e consistência]
+  B --> C[Medir<br/>testes + carga +<br/>observabilidade]
+  C --> D{Existe dor real?<br/>deploy, escala,<br/>times, incidentes}
+  D -- não --> E[Monólito modular<br/>fronteiras no código]
+  D -- sim --> F[Gateway na frente<br/>+ Strangler Fig]
+  F --> G[Extrair o menos<br/>acoplado primeiro]
+          </div>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag green">DEPOIS</span><span class="code-title">A origem vem do token, não do cliente</span><code class="code-file">RealizarTransferenciaCommandHandler.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>var idUsuario = _usuarioAtual.ObterIdUsuario();            // vem do JWT
+var chave = ChaveIdempotencia.Escopar(idUsuario, request.ChaveIdempotencia);
+
+var origem = await _contas.ObterPorUsuarioAsync(idUsuario)
+    ?? throw new RecursoNaoEncontradoException("INVALID_ACCOUNT", "O usuário autenticado não possui conta corrente.");
+
+var destino = await _contas.ObterPorNumeroAsync(request.NumeroContaDestino)
+    ?? throw new RecursoNaoEncontradoException("INVALID_DESTINATION", "Conta de destino não encontrada.");
+
+return await _transferencias.ProcessarAsync(origem.Id, destino.Id, request.Valor, chave, cancellationToken);</code></pre>
+          <div class="code-explain"><strong>Por que <code>IUsuarioAtual</code>?</strong> A camada Application deixou de depender de ASP.NET Core. O mesmo handler poderá rodar atrás de um consumidor Kafka no futuro, sem <code>HttpContext</code>.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Te pediram para migrar um sistema para microsserviços. Qual é o primeiro passo?</p>
+          <details><summary>Ver uma boa resposta</summary><div>
+            <p>Estabilizar e medir o que existe. Corrijo falhas de autorização e de consistência, crio testes de caracterização e coloco observabilidade no monólito.
+              Migrar um sistema com race condition só espalha o bug, e sem métricas eu não consigo provar que o sistema novo ficou melhor.</p>
+          </div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>BOLA</b> = autorização quebrada no nível do objeto</span><span><b>Characterization test</b> = teste que registra o comportamento atual</span><span><b>Hardening</b> = endurecimento / correção de segurança</span></div>
+          <p class="en">"Before splitting the monolith, we hardened it and measured it. You can't prove an improvement you never measured."</p>
+          <p class="pt">Antes de dividir o monólito, nós o corrigimos e medimos. Não dá para provar uma melhoria que você nunca mediu.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 2 ===================== -->
+      <section id="m-migrar" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 2</span><span class="estilo-pill fundamento">📐 Fundamento</span><span class="status-pill feito">✅ Decidido (ADR-001)</span></div>
+          <h2>Migrar ou não migrar? Monólito modular x microsserviços</h2>
+          <p class="module-subtitle">A pergunta que separa o pleno do sênior: quando NÃO usar microsserviços.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>"Microsserviços" virou meta em vez de ferramenta. Times quebram o sistema em dez serviços, cada um com seu banco, e descobrem que
+              uma simples transferência agora precisa de <strong>saga, compensação, mensageria e reconciliação</strong>.</p>
+            <p class="sub-alert">Num banco, cada consistência eventual a mais é um cenário em que o dinheiro fica "no limbo".</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Ter um <strong>critério</strong> para cada pedaço do sistema: fica no monólito modular ou vira microsserviço?
+              E saber defender as duas respostas numa reunião ou entrevista.</p>
+            <p class="sub-alert">No BankMore a resposta foi <strong>híbrida</strong>: núcleo modular + microsserviços nas bordas.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🏢</span><h3>Exemplo do Dia a Dia: a agência bancária e os terceirizados</h3></div>
+          <ul>
+            <li>O <strong>caixa e o cofre</strong> ficam dentro da agência, juntos. Ninguém coloca o cofre em outro prédio e manda o dinheiro de motoboy a cada saque: isso é o <strong>núcleo modular</strong>.</li>
+            <li>A <strong>gráfica</strong> que imprime talões, a <strong>empresa de segurança</strong> e a <strong>compensação</strong> com outros bancos são parceiros separados, com contrato: isso são os <strong>microsserviços</strong>.</li>
+            <li>A regra: o que precisa estar <em>sempre</em> certo junto, fica junto. O que pode atrasar ou falhar sozinho, sai.</li>
+          </ul>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">⚖️</span><h4>Critério de decisão aplicado ao BankMore</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th>Capacidade</th><th>Compartilha invariante com o saldo?</th><th>Fronteira clara?</th><th>Falha/escala sozinha?</th><th>Decisão</th></tr></thead>
+            <tbody>
+              <tr><td>Contas + ledger</td><td class="td-sim">Sim</td><td>—</td><td class="td-nao">Não</td><td>🧱 Núcleo modular</td></tr>
+              <tr><td>Transferência interna</td><td class="td-sim">Sim (débito e crédito juntos)</td><td>—</td><td class="td-nao">Não</td><td>🧱 Núcleo modular</td></tr>
+              <tr><td>Identity (login)</td><td class="td-nao">Não</td><td class="td-sim">Sim (só emite JWT)</td><td class="td-sim">Sim (picos de login)</td><td>🧩 Microsserviço</td></tr>
+              <tr><td>Tarifas, Notificações</td><td class="td-nao">Não (reagem a eventos)</td><td class="td-sim">Sim</td><td class="td-sim">Sim</td><td>🧩 Microsserviço (worker)</td></tr>
+              <tr><td>PIX externo + SPI + Antifraude</td><td>Parcial (bloqueio)</td><td class="td-sim">Sim</td><td class="td-sim">Sim (sistema externo)</td><td>🧩 Microsserviço + saga</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="verdict-grid">
+          <div class="verdict fica">
+            <h4>🧱 Por que NÃO migrou (núcleo)</h4>
+            <ul>
+              <li>A transferência interna debita, credita e grava o histórico numa <strong>única transação ACID</strong>.</li>
+              <li>Separar Contas de Transferências trocaria isso por <strong>saga + compensação</strong>, sem ganho de negócio.</li>
+              <li>Fronteiras continuam fortes, só que <strong>no código</strong> (módulos), não na rede.</li>
+            </ul>
+          </div>
+          <div class="verdict sai">
+            <h4>🧩 Por que migrou (bordas)</h4>
+            <ul>
+              <li><strong>Identity:</strong> ninguém faz join com usuários; muda em ritmo próprio (segurança).</li>
+              <li><strong>Tarifas/Notificações:</strong> se caírem, a transferência não pode cair junto.</li>
+              <li><strong>PIX/SPI:</strong> dependem do Banco Central, que falha de forma independente.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body"><strong>A resposta "monólito modular" não é fugir da tarefa.</strong> Se a empresa não tem dor de deploy, de escala ou de times brigando no mesmo código, microsserviços só adicionam custo operacional. Pergunte sempre: <em>qual dor estamos resolvendo?</em></div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Por que você não separou Contas e Transferências em serviços diferentes?</p>
+          <details><summary>Ver uma boa resposta</summary><div>
+            <p>Porque elas compartilham a invariante mais importante do banco: dinheiro não é criado nem perdido. Juntas, uma transferência é uma transação local ACID.
+              Separadas, eu precisaria de saga e compensação para algo que hoje é atômico. Mantive as duas no mesmo contexto, com fronteiras de módulo no código,
+              e levei para microsserviços só o que tem fronteira clara ou depende de sistema externo.</p>
+          </div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Modular monolith</b> = monólito modular</span><span><b>Invariant</b> = regra que nunca pode ser violada</span><span><b>Trade-off</b> = troca / custo-benefício</span></div>
+          <p class="en">"Things that must always be consistent together stay together. Things that can fail or lag independently can be split."</p>
+          <p class="pt">O que precisa estar sempre consistente junto fica junto. O que pode falhar ou atrasar de forma independente pode ser separado.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 3 ===================== -->
+      <section id="m-contextos" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 3</span><span class="estilo-pill fundamento">📐 Fundamento</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Os contextos (bounded contexts) de um banco</h2>
+          <p class="module-subtitle">Onde estão as fronteiras reais do negócio? Errar aqui é dividir no lugar errado.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>É comum dividir microsserviços por <strong>tabela</strong> ("serviço de Usuário, serviço de Conta, serviço de Movimento").
+              O resultado são serviços que conversam o tempo todo e não conseguem fazer nada sozinhos: um <strong>monólito distribuído</strong>.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Dividir por <strong>capacidade de negócio</strong>: cada contexto tem sua linguagem, seus dados e suas regras.
+              A palavra "conta" no Identity (login) não é a mesma "conta" no núcleo (dinheiro).</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🏬</span><h3>Exemplo do Dia a Dia: os departamentos de uma loja</h3></div>
+          <p>Para o estoque, "produto" é peso, prateleira e quantidade. Para o marketing, "produto" é foto, preço promocional e descrição.
+            Mesmo nome, significados diferentes. Cada departamento é um <strong>contexto</strong>, com sua própria ficha do produto.</p>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">🗺️</span><h4>Mapa de contextos do BankMore</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th>Contexto</th><th>Linguagem própria</th><th>Dados que possui</th><th>Publica</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Identity</strong></td><td>usuário, credencial, token</td><td><code>usuarios</code></td><td><code>UsuarioCadastrado</code>, <code>UsuarioEncerrado</code></td></tr>
+              <tr><td><strong>Contas (núcleo)</strong></td><td>conta, titular, saldo, bloqueio</td><td><code>contacorrente</code>, <code>movimento</code></td><td><code>SaqueRealizado</code>, <code>DepositoRealizado</code></td></tr>
+              <tr><td><strong>Transferência interna (núcleo)</strong></td><td>origem, destino, idempotência</td><td><code>transferencia</code>, <code>idempotencia</code></td><td><code>TransferenciaRealizada</code></td></tr>
+              <tr><td><strong>PIX</strong></td><td>chave, EndToEndId, liquidação, MED</td><td><code>pix</code>, estado da saga</td><td><code>PixConcluido</code>, <code>PixEstornado</code></td></tr>
+              <tr><td><strong>Tarifas</strong></td><td>pacote, tarifa, isenção</td><td><code>tarifa</code>, inbox</td><td><code>TarifaCobrada</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Context map: quem depende de quem</h4></div>
+          <div class="mermaid">
+flowchart TB
+  ID[Identity] -- "JWT (id do titular)" --> NU
+  subgraph NU[Núcleo modular]
+    CO[Contas] --- TR[Transferência interna]
+  end
+  PIX[PIX] -- "bloquear / estornar" --> NU
+  PIX -- "liquidar" --> SPI[SPI Simulado]
+  NU -- "eventos" --> TAR[Tarifas]
+  NU -- "eventos" --> NOT[Notificações]
+  PIX -- "eventos" --> NOT
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔑</div>
+          <div class="callout-body"><strong>O que já preparamos:</strong> a conta guarda o titular por <code>idusuario</code> <strong>sem chave estrangeira</strong> (ADR-002). Quando o Identity sair com banco próprio, nenhuma tabela precisa ser migrada: a conta já só conhece o <em>id</em>.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Como você decide as fronteiras dos microsserviços?</p>
+          <details><summary>Ver uma boa resposta</summary><div>
+            <p>Por capacidade de negócio, não por tabela. Procuro onde a linguagem muda e onde os dados têm um dono claro.
+              Se dois "serviços" precisam conversar a cada operação para funcionar, a fronteira está errada e eles deveriam ser um só.</p>
+          </div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Bounded context</b> = contexto delimitado</span><span><b>Ubiquitous language</b> = linguagem ubíqua (do negócio)</span><span><b>Distributed monolith</b> = monólito distribuído</span></div>
+          <p class="en">"Split by business capability, not by table. Otherwise you get a distributed monolith."</p>
+          <p class="pt">Divida por capacidade de negócio, não por tabela. Senão você ganha um monólito distribuído.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 4 ===================== -->
+      <section id="m-ledger" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 4</span><span class="estilo-pill modular">🧱 Monólito modular</span><span class="status-pill feito">✅ Implementado e provado</span></div>
+          <h2>Saldo, ledger e concorrência: o double-spend</h2>
+          <p class="module-subtitle">Como dois saques simultâneos criavam dinheiro do nada, e como um único UPDATE resolve.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>O saque fazia três coisas separadas: <strong>lia o saldo</strong>, <strong>gravava o movimento</strong> e <strong>recalculava o saldo</strong>.
+              Entre a leitura e a gravação, outro saque podia ler o mesmo saldo. Com R$ 100 na conta, dois saques de R$ 100 passavam.</p>
+            <p class="sub-alert">Esse é o <strong>double-spend</strong>: o tipo de bug que não aparece em teste de unidade e aparece no primeiro pico de Black Friday.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Fazer da checagem e do débito <strong>uma operação só</strong>: <code>UPDATE ... SET saldo = saldo - valor WHERE saldo &gt;= valor</code>.
+              O banco trava a linha e reavalia a condição, então é impossível dois débitos passarem pela mesma checagem.</p>
+          </div>
+        </div>
+
+        <div class="infographic-card">
+          <div class="infographic-header"><span class="infographic-title">🎨 Infográfico: "checar e depois debitar" x "o débito É a checagem"</span><span class="badge-tag green">Antes x Depois</span></div>
+          <div class="infographic-frame">
+            <svg viewBox="0 0 920 270" role="img" aria-label="Comparação entre o fluxo com race condition e o fluxo com update condicional">
+              <text x="220" y="26" text-anchor="middle" fill="#dc2626" font-size="15" font-weight="800">❌ ANTES: 3 passos sem transação</text>
+              <rect x="20" y="44" width="180" height="40" rx="10" fill="#fde8e8" stroke="#dc2626"/><text x="110" y="69" text-anchor="middle" fill="#7f1d1d" font-size="12" font-weight="700">Saque A lê saldo = 100</text>
+              <rect x="240" y="44" width="180" height="40" rx="10" fill="#fde8e8" stroke="#dc2626"/><text x="330" y="69" text-anchor="middle" fill="#7f1d1d" font-size="12" font-weight="700">Saque B lê saldo = 100</text>
+              <rect x="20" y="104" width="180" height="40" rx="10" fill="#fde8e8" stroke="#dc2626"/><text x="110" y="129" text-anchor="middle" fill="#7f1d1d" font-size="12" font-weight="700">A: 100 ≥ 100 → debita</text>
+              <rect x="240" y="104" width="180" height="40" rx="10" fill="#fde8e8" stroke="#dc2626"/><text x="330" y="129" text-anchor="middle" fill="#7f1d1d" font-size="12" font-weight="700">B: 100 ≥ 100 → debita</text>
+              <rect x="110" y="170" width="220" height="56" rx="12" fill="#dc2626"/><text x="220" y="196" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Saldo = −R$ 100</text><text x="220" y="215" text-anchor="middle" fill="#fee2e2" font-size="11">o banco pagou dinheiro que não existia</text>
+
+              <line x1="460" y1="20" x2="460" y2="250" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 6"/>
+
+              <text x="690" y="26" text-anchor="middle" fill="#059669" font-size="15" font-weight="800">✅ DEPOIS: 1 UPDATE condicional</text>
+              <rect x="500" y="44" width="380" height="40" rx="10" fill="#dcfce7" stroke="#059669"/><text x="690" y="69" text-anchor="middle" fill="#064e3b" font-size="12" font-weight="700">A: UPDATE … WHERE saldo ≥ 100 → 1 linha (trava a linha)</text>
+              <rect x="500" y="104" width="380" height="40" rx="10" fill="#dcfce7" stroke="#059669"/><text x="690" y="129" text-anchor="middle" fill="#064e3b" font-size="12" font-weight="700">B: espera o lock, reavalia: saldo 0 ≥ 100? → 0 linhas</text>
+              <rect x="580" y="170" width="220" height="56" rx="12" fill="#059669"/><text x="690" y="196" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Saldo = R$ 0</text><text x="690" y="215" text-anchor="middle" fill="#d1fae5" font-size="11">B recebe 422 INSUFFICIENT_FUNDS</text>
+            </svg>
+          </div>
+          <div class="infographic-caption"><strong>👁️ Num piscar de olhos:</strong> no lado vermelho, os dois saques "olharam" o saldo antes de alguém mexer nele. No lado verde, só existe um momento: o UPDATE. Quem chega depois espera o lock e encontra o saldo já atualizado.</div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🎟️</span><h3>Exemplo do Dia a Dia: o último ingresso do show</h3></div>
+          <p>Dois amigos olham o site ao mesmo tempo: "resta 1 ingresso". Os dois clicam em comprar. Se o site só confere a disponibilidade <em>antes</em> de reservar, vende o mesmo assento duas vezes.
+            O jeito certo é a reserva <strong>ser</strong> a conferência: "reserve o assento 12 <em>se ele ainda estiver livre</em>". Só um consegue.</p>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">1️⃣</span><h4>O que acontece numa transferência interna (passo a passo)</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th style="width:8%">Etapa</th><th style="width:46%">O que acontece</th><th style="width:46%">Por quê?</th></tr></thead>
+            <tbody>
+              <tr><td><strong>1</strong></td><td>Abre transação <code>READ COMMITTED</code> dentro de uma <em>execution strategy</em>.</td><td>Se der deadlock ou falha transitória, a estratégia refaz a transação <strong>inteira</strong>.</td></tr>
+              <tr><td><strong>2</strong></td><td>Consulta a tabela <code>idempotencia</code> pela chave.</td><td>Reenvio com a mesma chave devolve o resultado original (módulo 5).</td></tr>
+              <tr><td><strong>3</strong></td><td>Trava as duas contas <strong>sempre em ordem crescente de Id</strong>.</td><td>Evita deadlock entre A→B e B→A simultâneas.</td></tr>
+              <tr><td><strong>4</strong></td><td><code>UPDATE</code> condicional na origem (<code>ativo AND saldo &gt;= valor</code>) e crédito no destino.</td><td>Se afetar 0 linhas, descobre o motivo: conta inexistente, inativa ou saldo insuficiente.</td></tr>
+              <tr><td><strong>5</strong></td><td>Insere os dois movimentos (débito e crédito), a transferência e a chave de idempotência.</td><td>Histórico, saldo e idempotência nunca divergem: estão no mesmo commit.</td></tr>
+              <tr><td><strong>6</strong></td><td><code>COMMIT</code>.</td><td>Tudo ou nada. Qualquer exceção antes disso desfaz tudo.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-spotlight code-antes">
+          <div class="code-header"><span class="badge-tag red">ANTES</span><span class="code-title">Três idas ao banco, sem transação</span><code class="code-file">MovimentarContaCommandHandler.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>if (request.Tipo == "D" &amp;&amp; conta.Saldo &lt; request.Valor)     // 1. lê e checa
+    throw new InvalidOperationException("Saldo insuficiente...");
+
+await _movimentoRepo.AdicionarAsync(movimento);              // 2. grava
+
+var novoSaldo = await _movimentoRepo.CalcularSaldoAsync(conta.Id);
+await _contaRepo.AtualizarSaldoAsync(conta.Id, novoSaldo);   // 3. recalcula e grava de novo</code></pre>
+        </div>
+
+        <div class="code-spotlight code-depois">
+          <div class="code-header"><span class="badge-tag green">DEPOIS</span><span class="code-title">A checagem É o update</span><code class="code-file">MovimentacaoFinanceiraEfCore.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>await using var transacao = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+
+var linhas = await _context.ContasCorrente
+    .Where(x =&gt; x.Id == idConta &amp;&amp; x.Ativo &amp;&amp; x.Saldo &gt;= valor)   // a condição faz parte do UPDATE
+    .ExecuteUpdateAsync(set =&gt; set
+        .SetProperty(x =&gt; x.Saldo, x =&gt; x.Saldo - valor)
+        .SetProperty(x =&gt; x.AtualizadoEm, agora), ct);
+
+if (linhas == 0)
+    throw await DiagnosticoDeConta.ExplicarFalhaAsync(_context, idConta, "movimentação", ct);
+
+var movimento = Movimento.CriarDebito(idConta, valor, chave, descricao);
+_context.Movimentos.Add(movimento);
+_context.Idempotencias.Add(new Idempotencia(chave, requisicao, movimento.Id.ToString()));
+
+await _context.SaveChangesAsync(ct);
+await transacao.CommitAsync(ct);</code></pre>
+        </div>
+
+        <div class="decision-box">
+          <div class="badge-tag purple">⚖️ Decisão de arquitetura</div>
+          <h3>O deadlock que só o teste de carga mostrou</h3>
+          <p>Com o UPDATE condicional no lugar, 40 transferências <strong>cruzadas</strong> simultâneas (Alex → Maria e Maria → Alex) ainda devolveram <strong>24 erros 500</strong>.
+            O dinheiro estava certo (cada deadlock vira rollback), mas o cliente recebia erro.</p>
+          <p>Causa: a transação A trava a conta do Alex e espera a da Maria; a B trava a da Maria e espera a do Alex. Correção: <strong>travar sempre na mesma ordem</strong> (Id crescente).
+            Resultado: <strong>40 de 40</strong> aceitas, em 4 execuções seguidas.</p>
+          <p style="margin:0"><em>Retry esconde o sintoma; ordem de lock remove a causa.</em></p>
+        </div>
+
+        <div class="decision-box">
+          <div class="badge-tag purple">⚖️ Decisão de arquitetura</div>
+          <h3>READ COMMITTED, e não SERIALIZABLE</h3>
+          <p style="margin:0">SERIALIZABLE parece mais seguro, mas aqui não acrescenta nada: o UPDATE condicional já trava a linha e reavalia a condição.
+            O custo é real: no PostgreSQL, carga concorrente gera erros <code>40001</code> que viram HTTP 500.</p>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Como você evita que dois saques simultâneos deixem a conta negativa?</p>
+          <details><summary>Ver uma boa resposta</summary><div>
+            <p>Não faço "ler saldo, checar e depois debitar". Uso <code>UPDATE ... SET saldo = saldo - @valor WHERE id = @id AND saldo &gt;= @valor</code> e verifico as linhas afetadas.
+              O banco trava a linha e reavalia a condição, então checagem e débito viram uma operação só. Movimento e idempotência entram na mesma transação,
+              as linhas são travadas em ordem fixa para evitar deadlock, e a execution strategy repete a transação inteira em falha transitória.</p>
+          </div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Race condition</b> = condição de corrida</span><span><b>Conditional update</b> = atualização condicional</span><span><b>Lock ordering</b> = ordem de aquisição de locks</span><span><b>Ledger</b> = livro-razão</span></div>
+          <p class="en">"We never check the balance and then debit it in two steps. The debit itself is the check."</p>
+          <p class="pt">Nunca checamos o saldo e debitamos em dois passos. O próprio débito é a checagem.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 5 ===================== -->
+      <section id="m-idempotencia" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 5</span><span class="estilo-pill modular">🧱 Monólito modular</span><span class="status-pill feito">✅ Implementado</span></div>
+          <h2>Idempotência bancária: o reenvio não pode mover dinheiro de novo</h2>
+          <p class="module-subtitle">O app deu timeout. O PIX saiu ou não? O cliente aperta "enviar" de novo.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>A transferência foi processada, mas a resposta se perdeu na rede (timeout, 4G caindo). O app reenvia.
+              Sem idempotência, o cliente paga <strong>duas vezes</strong>.</p>
+            <p class="sub-alert">A versão antiga do BankMore devolvia <code>409</code> no reenvio: o dinheiro não saía de novo, mas o cliente continuava sem saber se a primeira deu certo.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <ul>
+              <li>Mesma chave + mesmo conteúdo → <strong>200</strong> com o <strong>mesmo id</strong> e <code>replay: true</code>.</li>
+              <li>Mesma chave + conteúdo diferente → <strong>422</strong> <code>IDEMPOTENCY_CONFLICT</code>.</li>
+              <li>Chave <strong>escopada ao usuário</strong>: ninguém "queima" a chave de outro cliente.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🧾</span><h3>Exemplo do Dia a Dia: o número do pedido no restaurante</h3></div>
+          <p>Você pede no balcão e recebe a senha <strong>042</strong>. Se perguntar de novo "e o meu pedido 042?", o atendente não faz outro lanche: ele te mostra o mesmo.
+            Mas se você disser "042, só que agora com bacon", ele responde: "essa senha é de outro pedido". A senha é a <strong>chave de idempotência</strong>.</p>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Fluxograma: as três respostas possíveis</h4></div>
+          <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor App as 📱 App do cliente
+    participant API as 🏦 BankMore
+    participant DB as 🗄️ Banco
+    App->>API: POST /transferencias (Idempotency-Key: abc, R$ 100)
+    API->>DB: chave "usuario:abc" existe? não
+    API->>DB: debita, credita, grava chave (mesma transação)
+    API--xApp: 201 ... resposta perdida (timeout)
+    App->>API: reenvia (Idempotency-Key: abc, R$ 100)
+    API->>DB: chave existe, mesmo conteúdo
+    API-->>App: 200 replay:true, mesmo id (nada se move)
+    App->>API: Idempotency-Key: abc, R$ 999
+    API-->>App: 422 IDEMPOTENCY_CONFLICT
+          </div>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag green">CÓDIGO</span><span class="code-title">Replay ou conflito</span><code class="code-file">TransferenciaFinanceiraEfCore.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>var requisicao = string.Create(CultureInfo.InvariantCulture,
+    $"transferencia:{idContaOrigem}:{idContaDestino}:{valor:F2}");
+
+var existente = await BuscarIdempotenciaAsync(chaveIdempotencia, ct);
+if (existente is not null)
+    return Replay(existente, requisicao);
+
+static ResultadoOperacaoFinanceira Replay(Idempotencia existente, string requisicao)
+{
+    if (!string.Equals(existente.Requisicao, requisicao, StringComparison.Ordinal))
+        throw new ConflitoDeIdempotenciaException();          // 422
+
+    return new ResultadoOperacaoFinanceira(Guid.Parse(existente.Resultado), Replay: true); // 200
+}</code></pre>
+          <div class="code-explain"><strong>E se duas requisições com a mesma chave chegarem juntas?</strong> As duas passam pela consulta, mas só uma consegue inserir a chave (chave primária). A outra recebe <code>DbUpdateException</code>, sofre rollback completo, relê a chave e devolve o replay.</div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🇧🇷</div>
+          <div class="callout-body"><strong>No PIX real</strong>, o papel da chave de idempotência é do <code>EndToEndId</code>: um identificador único da transação, gerado por quem inicia o pagamento. No capítulo 11 ele vira a chave da saga.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">O cliente reenviou a transferência por causa de timeout. O que sua API faz?</p>
+          <details><summary>Ver uma boa resposta</summary><div>
+            <p>Devolve o resultado original. A chave de idempotência é gravada na mesma transação da transferência, junto com uma descrição do conteúdo.
+              Reenvio idêntico recebe 200 com o mesmo id; mesma chave com outro valor recebe 422. A chave é escopada ao usuário autenticado.</p>
+          </div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Idempotent</b> = idempotente (repetir não muda o resultado)</span><span><b>Replay</b> = reenvio que devolve o resultado original</span><span><b>Retry storm</b> = avalanche de retentativas</span></div>
+          <p class="en">"Retrying a payment must be safe. The idempotency key turns 'did it go through?' into a question the API can always answer."</p>
+          <p class="pt">Repetir um pagamento precisa ser seguro. A chave de idempotência transforma "será que foi?" numa pergunta que a API sempre sabe responder.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 6 ===================== -->
+      <section id="m-modular" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 6</span><span class="estilo-pill modular">🧱 Monólito modular</span><span class="status-pill planejado">🗓️ Próximo capítulo</span></div>
+          <h2>Monólito modular: fronteiras fortes sem pagar o preço da rede</h2>
+          <p class="module-subtitle">Como deixar Contas e Transferências no mesmo deploy sem virar uma bola de lama.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>"Monólito" virou sinônimo de bagunça porque, sem regras, qualquer classe chama qualquer classe e qualquer consulta faz join com qualquer tabela.
+              Depois de alguns anos, ninguém consegue mudar nada sem quebrar outra coisa.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Módulos com <strong>contrato público</strong> e <strong>internals escondidos</strong>, um schema por módulo e testes de arquitetura que
+              <strong>quebram o build</strong> se alguém atravessar a fronteira.</p>
+            <p class="sub-alert">Se um dia um módulo precisar virar microsserviço, ele já está desacoplado: muda só o transporte.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🏢</span><h3>Exemplo do Dia a Dia: o prédio comercial com salas trancadas</h3></div>
+          <p>Várias empresas no mesmo prédio dividem elevador, energia e portaria (o mesmo deploy). Mas cada sala tem porta trancada e recepção:
+            você não entra na sala do vizinho para pegar um documento, você <strong>pede na recepção</strong> (o contrato público do módulo).</p>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">🧭</span><h4>Regras do monólito modular do BankMore (código-alvo)</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th>Regra</th><th>Como garantir</th></tr></thead>
+            <tbody>
+              <tr><td>Um módulo só expõe o projeto <code>*.Contratos</code></td><td>Classes internas com <code>internal</code>; referência de projeto só para Contratos.</td></tr>
+              <tr><td>Cada módulo tem seu schema (<code>contas.*</code>, <code>transferencias.*</code>)</td><td>Um <code>DbContext</code> por módulo; nenhum join entre schemas.</td></tr>
+              <tr><td>Comunicação entre módulos por interface ou evento in-process</td><td>MediatR notifications hoje; Kafka amanhã, se o módulo sair.</td></tr>
+              <tr><td>Fronteira violada = build vermelho</td><td>Testes de arquitetura com NetArchTest.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag amber">CÓDIGO-ALVO</span><span class="code-title">Teste que impede atravessar a fronteira</span><code class="code-file">ArquiteturaTests.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>[Fact]
+public void Transferencias_so_conversa_com_Contas_pelo_contrato()
+{
+    var resultado = Types.InAssembly(typeof(TransferenciasModule).Assembly)
+        .ShouldNot()
+        .HaveDependencyOn("BankMore.Nucleo.Contas.Infraestrutura")
+        .GetResult();
+
+    resultado.IsSuccessful.Should().BeTrue("módulos só se falam pelo projeto Contratos");
+}</code></pre>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Big ball of mud</b> = bola de lama (código sem estrutura)</span><span><b>Module boundary</b> = fronteira de módulo</span><span><b>Architecture test</b> = teste de arquitetura</span></div>
+          <p class="en">"A modular monolith gives you strong boundaries in code without paying the network tax."</p>
+          <p class="pt">Um monólito modular te dá fronteiras fortes no código sem pagar o "imposto" da rede.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 7 ===================== -->
+      <section id="m-gateway" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 7</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Gateway e Strangler Fig: trocar o motor com o avião voando</h2>
+          <p class="module-subtitle">Como extrair serviços do monólito sem parar o banco e com rollback em segundos.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>A tentação é a <strong>reescrita total</strong> ("big bang"): passar um ano construindo o sistema novo e trocar tudo num fim de semana.
+              É o caminho clássico para um projeto de migração fracassar. Num banco, não existe "fim de semana sem PIX".</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Colocar um <strong>gateway (YARP)</strong> na frente do monólito com 100% do tráfego indo para ele. Depois, desviar <strong>uma rota por vez</strong> para o serviço novo.
+              Rollback = apagar a rota.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🌳</span><h3>Exemplo do Dia a Dia: a figueira-mata-pau e a reforma da rodovia</h3></div>
+          <p>A figueira estranguladora cresce em volta de uma árvore antiga até substituí-la por completo, sem que a floresta perceba o momento da troca.
+            Numa rodovia em obra, o tráfego é desviado pista por pista: a estrada nunca fecha, e se a pista nova der problema, o desvio volta.</p>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>As fases do Strangler Fig no BankMore</h4></div>
+          <div class="mermaid">
+flowchart LR
+  subgraph F1[Fase 1: nada muda para o cliente]
+    G1[Gateway] -->|100%| M1[Monólito]
+  end
+  subgraph F2[Fase 2: primeira extração]
+    G2[Gateway] -->|/api/login| ID[Identity]
+    G2 -->|resto| M2[Monólito]
+  end
+  subgraph F3[Fase 3: novas features nascem fora]
+    M3[Monólito + Outbox] --> K[(Kafka)] --> T[Tarifas]
+  end
+  F1 --> F2 --> F3
+          </div>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag amber">CÓDIGO-ALVO</span><span class="code-title">Desvio de uma rota no YARP</span><code class="code-file">Gateway/appsettings.json</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>"ReverseProxy": {
+  "Routes": {
+    "identity-login":    { "ClusterId": "identity", "Order": 1,   "Match": { "Path": "/api/login/{**resto}" } },
+    "monolito-fallback": { "ClusterId": "monolito", "Order": 100, "Match": { "Path": "/{**resto}" } }
+  },
+  "Clusters": {
+    "identity": { "Destinations": { "d1": { "Address": "http://identity:8080" } } },
+    "monolito": { "Destinations": { "d1": { "Address": "http://bankmore-api:80" } } }
+  }
+}</code></pre>
+          <div class="code-explain"><strong>⚠️ Pré-requisito escondido:</strong> o JWT emitido pelo Identity novo precisa ser idêntico ao do monólito (issuer, audience, chave, claims). Senão, todo mundo que já está logado perde a sessão na virada.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Por que extrair o Identity primeiro?</p>
+          <details><summary>Ver uma boa resposta</summary><div><p>Porque é o menos acoplado: só emite tokens, ninguém faz join com a tabela de usuários e a conta já referencia o titular só pelo id, sem FK.
+            É uma extração de baixo risco que testa toda a esteira (gateway, deploy, observabilidade) antes de mexer em algo que move dinheiro.</p></div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Strangler Fig</b> = substituir o legado aos poucos</span><span><b>Big bang rewrite</b> = reescrita total de uma vez</span><span><b>Cutover</b> = virada</span></div>
+          <p class="en">"We never switch everything at once. The gateway lets us move one route at a time and roll back by changing configuration."</p>
+          <p class="pt">Nunca trocamos tudo de uma vez. O gateway permite mover uma rota por vez e voltar atrás mudando só configuração.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 8 ===================== -->
+      <section id="m-comunicacao" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 8</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Síncrono x assíncrono: quando perguntar e quando avisar</h2>
+          <p class="module-subtitle">Consultar saldo é pergunta. Cobrar tarifa é aviso. Misturar os dois derruba o sistema.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>Se a transferência chama a API de Tarifas e a de Notificações por HTTP e espera as duas responderem, qualquer lentidão nelas vira lentidão na transferência.
+              Se Notificações cair, <strong>o PIX cai junto</strong> por causa de um SMS.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p><strong>Síncrono</strong> só quando o chamador <em>precisa da resposta para continuar</em> (validar conta de destino).
+              <strong>Assíncrono</strong> (evento) quando é só um aviso de que algo aconteceu (cobrar tarifa, notificar).</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">📞</span><h3>Exemplo do Dia a Dia: ligação x mensagem no WhatsApp</h3></div>
+          <p>Para saber se a farmácia tem o remédio antes de sair de casa, você <strong>liga</strong> (síncrono: precisa da resposta agora).
+            Para avisar a família que chegou bem, você <strong>manda mensagem</strong> (assíncrono: cada um lê quando puder, e você segue sua vida).</p>
+        </div>
+
+        <div class="step-table-wrapper">
+          <table class="didactic-table">
+            <thead><tr><th>Interação no BankMore</th><th>Estilo</th><th>Por quê</th></tr></thead>
+            <tbody>
+              <tr><td>Confirmar titular da conta de destino</td><td>🔁 Síncrono (HTTP)</td><td>O cliente precisa ver "Maria S." antes de confirmar.</td></tr>
+              <tr><td>PIX pedir bloqueio de saldo ao núcleo</td><td>🔁 Síncrono</td><td>Sem bloqueio não dá para seguir a saga.</td></tr>
+              <tr><td>Cobrar tarifa da transferência</td><td>📨 Evento</td><td>Pode acontecer segundos depois; não pode travar a transferência.</td></tr>
+              <tr><td>Notificar o cliente</td><td>📨 Evento</td><td>Falha no envio não desfaz o pagamento.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Temporal coupling</b> = acoplamento temporal</span><span><b>Fire and forget</b> = disparar e esquecer</span><span><b>Request/response</b> = requisição/resposta</span></div>
+          <p class="en">"Use a request when you need an answer to continue. Use an event when you are just telling the world something happened."</p>
+          <p class="pt">Use requisição quando precisa da resposta para continuar. Use evento quando só está avisando que algo aconteceu.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 9 ===================== -->
+      <section id="m-outbox" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 9</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Outbox + Kafka: a tarifa que nunca é cobrada duas vezes (nem esquecida)</h2>
+          <p class="module-subtitle">Como garantir que o evento sai se o banco commitou, e só se commitou.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real: "dual write"</div>
+            <p>A transferência faz <code>COMMIT</code> no banco e depois publica <code>TransferenciaRealizada</code> no Kafka. Se o servidor cair entre os dois:
+              o dinheiro saiu, mas a <strong>tarifa nunca é cobrada</strong> e o cliente nunca é notificado.</p>
+            <p class="sub-alert">Publicar antes do commit é pior: o evento sai e a transação pode dar rollback. Tarifa cobrada de uma transferência que não existiu.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Gravar o evento numa tabela <code>outbox</code> <strong>na mesma transação</strong> da transferência. Um <em>relay</em> em segundo plano lê a tabela e publica no Kafka.
+              Do outro lado, o consumidor de Tarifas guarda o id do evento numa <strong>inbox</strong> para ignorar duplicatas.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">📮</span><h3>Exemplo do Dia a Dia: a caixa de saída do escritório</h3></div>
+          <p>Você não sai correndo ao correio a cada carta. Coloca na <strong>caixa de saída</strong> junto com o arquivamento do documento (mesma ação).
+            O office-boy passa de hora em hora e leva tudo. Se ele faltar hoje, as cartas continuam na caixa e saem amanhã. Nada se perde.</p>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Fluxograma: Outbox + Inbox</h4></div>
+          <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant N as 🏦 Núcleo
+    participant DB as 🗄️ Banco do núcleo
+    participant R as 🔁 Relay (BackgroundService)
+    participant K as 📨 Kafka
+    participant T as 💰 Tarifas
+    N->>DB: BEGIN, debita, credita, INSERT outbox (TransferenciaRealizada), COMMIT
+    loop a cada 2s
+      R->>DB: SELECT ... WHERE publicado IS NULL FOR UPDATE SKIP LOCKED
+      R->>K: publica evento (id = outbox.id)
+      R->>DB: marca publicado
+    end
+    K->>T: entrega (pelo menos uma vez)
+    T->>T: id já está na inbox? ignora. Senão cobra tarifa + grava id (mesma transação)
+          </div>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag amber">CÓDIGO-ALVO</span><span class="code-title">O evento entra na MESMA transação da transferência</span><code class="code-file">TransferenciaFinanceiraEfCore.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>_context.Transferencias.Add(new Transferencia(idTransferencia, idContaOrigem, idContaDestino, agora, valor));
+_context.Idempotencias.Add(new Idempotencia(chaveIdempotencia, requisicao, idTransferencia.ToString()));
+
+// Outbox: mesmo SaveChanges, mesmo COMMIT. Ou tudo existe, ou nada existe.
+_context.Outbox.Add(OutboxMessage.De(
+    new TransferenciaRealizada(idTransferencia, idContaOrigem, idContaDestino, valor, agora)));
+
+await _context.SaveChangesAsync(ct);
+await transacao.CommitAsync(ct);</code></pre>
+          <div class="code-explain"><strong>Garantia real:</strong> <em>at-least-once</em> (pelo menos uma vez). "Exatamente uma vez" só existe do ponto de vista do negócio, graças à inbox do consumidor.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Como garantir que o evento sai se o banco commitou?</p>
+          <details><summary>Ver uma boa resposta</summary><div><p>Com Outbox: grava o evento numa tabela na mesma transação do dado de negócio, e um relay publica depois. Isso dá entrega pelo menos uma vez;
+            o consumidor deduplica pelo id do evento numa inbox, gravada na mesma transação do efeito que ele produz.</p></div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Dual write</b> = escrita dupla (banco + broker)</span><span><b>At-least-once</b> = pelo menos uma vez</span><span><b>Inbox / dedup</b> = caixa de entrada / deduplicação</span></div>
+          <p class="en">"The outbox makes the event part of the same transaction. The inbox makes processing it twice harmless."</p>
+          <p class="pt">O outbox torna o evento parte da mesma transação. A inbox torna inofensivo processá-lo duas vezes.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 10 ===================== -->
+      <section id="m-circuit" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 10</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Circuit Breaker no SPI: o Banco Central caiu, e agora?</h2>
+          <p class="module-subtitle">Proteger o sistema de uma dependência externa doente, com uma regra de negócio clara para o cliente.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>O SPI (sistema de liquidação do PIX) começa a demorar 30 segundos e falhar. Cada PIX segura uma thread esperando.
+              Em minutos, o serviço de PIX esgota conexões e <strong>para de responder até para quem só quer ver o extrato</strong>.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Depois de N falhas seguidas, <strong>abrir o circuito</strong>: parar de chamar o SPI por um tempo e responder rápido.
+              E decidir o que o <strong>cliente</strong> vê: o PIX vira <code>PENDENTE_LIQUIDACAO</code>, com o saldo bloqueado, e é retomado quando o SPI voltar.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">⚡</span><h3>Exemplo do Dia a Dia: o disjuntor da sua casa</h3></div>
+          <p>Quando o chuveiro dá curto, o disjuntor desarma e protege a fiação da casa inteira. Você não fica religando a cada segundo: espera um pouco,
+            religa uma vez para testar (<em>meio-aberto</em>) e, se estiver tudo bem, volta ao normal (<em>fechado</em>).</p>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Os três estados do disjuntor</h4></div>
+          <div class="mermaid">
+stateDiagram-v2
+    [*] --> Fechado
+    Fechado --> Aberto: 3 falhas seguidas no SPI
+    Aberto --> MeioAberto: após 30s
+    MeioAberto --> Fechado: chamada de teste OK
+    MeioAberto --> Aberto: chamada de teste falhou
+    note right of Aberto: SPI não é chamado. PIX vira PENDENTE_LIQUIDACAO
+          </div>
+        </div>
+
+        <div class="decision-box">
+          <div class="badge-tag purple">⚖️ Decisão de negócio (ainda em aberto)</div>
+          <h3>Circuito aberto: rejeitar o PIX ou deixar pendente?</h3>
+          <p style="margin:0"><strong>Rejeitar</strong> é simples e honesto, mas o cliente precisa tentar de novo. <strong>Pendente</strong> é melhor para o cliente, mas exige bloqueio de saldo,
+            reprocessamento e um prazo máximo para estornar automaticamente. Essa escolha é do negócio, não do desenvolvedor: o papel do dev é mostrar o custo de cada opção.</p>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Circuit breaker</b> = disjuntor</span><span><b>Fail fast</b> = falhar rápido</span><span><b>Half-open</b> = meio-aberto</span><span><b>Graceful degradation</b> = degradação controlada</span></div>
+          <p class="en">"When a dependency is sick, failing fast protects everyone else. The business decides what the customer sees."</p>
+          <p class="pt">Quando uma dependência está doente, falhar rápido protege todo o resto. O negócio decide o que o cliente vê.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 11 ===================== -->
+      <section id="m-saga" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 11</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>A saga do PIX: bloqueio, liquidação e estorno</h2>
+          <p class="module-subtitle">Quando não existe transação ACID que cubra dois sistemas, cada passo precisa saber se desfazer.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>O PIX externo envolve o BankMore <strong>e</strong> o Banco Central. Não existe <code>BEGIN TRANSACTION</code> que abrace os dois.
+              Se o débito acontece e a liquidação falha, o dinheiro some da conta do cliente sem chegar ao destino.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Uma <strong>saga orquestrada</strong> com estado persistido: cada passo tem uma <strong>compensação</strong>.
+              Primeiro <em>bloqueia</em> o saldo (não debita); só efetiva depois da liquidação; se algo falhar, desbloqueia.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🏨</span><h3>Exemplo do Dia a Dia: a pré-autorização do cartão no hotel</h3></div>
+          <p>No check-in o hotel <strong>bloqueia</strong> um valor no seu cartão, mas não cobra. No check-out, cobra o valor real e libera o resto.
+            Se você cancelar, o bloqueio é <strong>liberado</strong>. O dinheiro nunca sai antes de a operação estar garantida.</p>
+        </div>
+
+        <div class="diagram-container">
+          <div class="diagram-header"><span class="icon">📊</span><h4>Máquina de estados da saga do PIX</h4></div>
+          <div class="mermaid">
+stateDiagram-v2
+    [*] --> INICIADA
+    INICIADA --> BLOQUEADA: núcleo bloqueia saldo
+    BLOQUEADA --> EM_ANALISE: antifraude
+    EM_ANALISE --> ESTORNADA: recusado → desbloqueia
+    EM_ANALISE --> LIQUIDADA: SPI confirmou
+    EM_ANALISE --> ESTORNADA: SPI falhou → desbloqueia
+    LIQUIDADA --> CONCLUIDA: efetiva débito + Outbox
+    ESTORNADA --> [*]
+    CONCLUIDA --> [*]
+    EM_ANALISE --> FALHA_COMPENSACAO: desbloqueio falhou
+    FALHA_COMPENSACAO --> ESTORNADA: job de reconciliação
+          </div>
+        </div>
+
+        <div class="step-table-wrapper">
+          <table class="didactic-table">
+            <thead><tr><th>Passo</th><th>Ação</th><th>Compensação</th></tr></thead>
+            <tbody>
+              <tr><td>1. Bloquear</td><td>Núcleo cria um bloqueio de R$ X (saldo disponível cai, saldo contábil não)</td><td>Remover o bloqueio</td></tr>
+              <tr><td>2. Antifraude</td><td>Aprova, recusa ou manda para revisão</td><td>Nenhuma (só leitura)</td></tr>
+              <tr><td>3. Liquidar</td><td>Envia ao SPI com o <code>EndToEndId</code> (idempotente)</td><td>Devolução (MED) se já liquidou</td></tr>
+              <tr><td>4. Efetivar</td><td>Converte o bloqueio em débito + grava evento no Outbox</td><td>— (ponto sem volta)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout-danger">
+          <div class="callout-icon">🚨</div>
+          <div class="callout-body"><strong>O cenário que o lab do Order/Payment não cobria:</strong> e se a <em>compensação</em> falhar? No laboratório original isso só gerava um log. Num banco, vira o estado <code>FALHA_COMPENSACAO</code>, persistido, com um job de reconciliação e alerta para a operação. Dinheiro bloqueado "esquecido" é reclamação no Banco Central.</div>
+        </div>
+
+        <div class="interview-box">
+          <div class="badge-tag blue">🎤 Pergunta de entrevista</div>
+          <p class="interview-q">Orquestração ou coreografia para a saga do PIX? E se o estorno falhar?</p>
+          <details><summary>Ver uma boa resposta</summary><div><p>Orquestração: num fluxo financeiro eu quero um lugar só que conhece o estado e decide a compensação, o que facilita auditoria.
+            O estado é persistido a cada passo. Se a compensação falhar, a saga vai para FALHA_COMPENSACAO, um job de reconciliação tenta de novo com idempotência e, esgotadas as tentativas, alerta a operação.</p></div></details>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Compensating transaction</b> = transação de compensação</span><span><b>Orchestration</b> = orquestração</span><span><b>Authorization hold</b> = bloqueio / pré-autorização</span><span><b>Settlement</b> = liquidação</span></div>
+          <p class="en">"We hold the funds first and only capture them after settlement. If anything fails, we release the hold."</p>
+          <p class="pt">Primeiro bloqueamos o valor e só efetivamos depois da liquidação. Se algo falhar, liberamos o bloqueio.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 12 ===================== -->
+      <section id="m-observabilidade" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 12</span><span class="estilo-pill micro">🧩 Microsserviço</span><span class="status-pill planejado">🗓️ Planejado</span></div>
+          <h2>Observabilidade com LGPD: rastrear sem vazar CPF</h2>
+          <p class="module-subtitle">Distributed tracing num banco tem uma regra extra: dado pessoal não entra no span.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>Para depurar, o dev coloca o CPF e o nome no log e no trace. Esses dados vão parar no Jaeger, no Elastic, em backups e em telas que
+              dezenas de pessoas acessam. Isso é um <strong>incidente de LGPD</strong> esperando para acontecer.</p>
+            <p class="sub-alert">O BankMore tinha o CPF dentro do JWT, que é só Base64: qualquer um lê. Já foi removido na Fase 0.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Correlacionar tudo por <code>TraceId</code>, <code>EndToEndId</code> e id da conta, com um <strong>processor</strong> do OpenTelemetry que mascara qualquer atributo sensível antes de exportar.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">📦</span><h3>Exemplo do Dia a Dia: o código de rastreio dos Correios</h3></div>
+          <p>Você acompanha a encomenda inteira só pelo código <code>BR123456789SP</code>. A etiqueta de rastreio não traz seu CPF nem o que tem dentro da caixa:
+            ela identifica a <strong>jornada</strong>, não a <strong>pessoa</strong>.</p>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag amber">CÓDIGO-ALVO</span><span class="code-title">Mascarar atributos antes de exportar o span</span><code class="code-file">MascaramentoPiiProcessor.cs</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>public sealed class MascaramentoPiiProcessor : BaseProcessor&lt;Activity&gt;
+{
+    private static readonly string[] Sensiveis = ["cpf", "nome", "email", "enduser.id"];
+
+    public override void OnEnd(Activity activity)
+    {
+        foreach (var tag in activity.TagObjects.ToList())
+            if (Sensiveis.Any(s =&gt; tag.Key.Contains(s, StringComparison.OrdinalIgnoreCase)))
+                activity.SetTag(tag.Key, "***");
+    }
+}</code></pre>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>PII</b> = dado pessoal identificável</span><span><b>Span / Trace</b> = trecho / rastro de uma requisição</span><span><b>Redaction</b> = mascaramento</span></div>
+          <p class="en">"Traces identify the journey, not the person. PII is redacted before anything leaves the service."</p>
+          <p class="pt">Traces identificam a jornada, não a pessoa. Dado pessoal é mascarado antes de sair do serviço.</p>
+        </div>
+      </section>
+
+      <!-- ===================== MÓDULO 13 ===================== -->
+      <section id="m-k6" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">MÓDULO 13</span><span class="estilo-pill prova">🧪 Prova</span><span class="status-pill feito">✅ Implementado</span></div>
+          <h2>Carga e concorrência com k6: provar que o saldo fecha</h2>
+          <p class="module-subtitle">Teste de unidade prova a regra. Teste de carga prova que a regra aguenta gente de verdade.</p>
+        </div>
+
+        <div class="problem-objective-grid">
+          <div class="card-problem">
+            <div class="badge-tag red">❌ O Problema no Mundo Real</div>
+            <p>Os 47 testes de unidade estavam verdes e mesmo assim o sistema tinha deadlock. Testes de unidade rodam uma requisição por vez;
+              bugs de concorrência só aparecem com <strong>várias requisições ao mesmo tempo</strong> contra um banco real.</p>
+          </div>
+          <div class="card-objective">
+            <div class="badge-tag green">🎯 O Nosso Objetivo</div>
+            <p>Um script k6 com <strong>critério de aprovação financeiro</strong>, não só de performance: "exatamente 10 saques aceitos e saldo final R$ 0,00".
+              Se um centavo for criado ou perdido, o teste falha.</p>
+          </div>
+        </div>
+
+        <div class="analogy-box">
+          <div class="analogy-header"><span class="analogy-emoji">🌉</span><h3>Exemplo do Dia a Dia: a prova de carga da ponte</h3></div>
+          <p>Antes de inaugurar uma ponte, os engenheiros colocam caminhões carregados em cima e medem a deformação. Ninguém aceita "calculei e deve aguentar".
+            O teste de carga é o caminhão em cima do seu código.</p>
+        </div>
+
+        <div class="step-table-wrapper">
+          <div class="table-title"><span class="step-num">📈</span><h4>Resultados medidos no laboratório (PostgreSQL 16)</h4></div>
+          <table class="didactic-table">
+            <thead><tr><th>Cenário</th><th>Antes</th><th>Depois</th></tr></thead>
+            <tbody>
+              <tr><td>50 saques simultâneos de R$ 10 sobre R$ 100</td><td class="td-nao">Vários passavam; saldo podia ficar negativo</td><td class="td-sim">10 aceitos · 40 recusados · saldo R$ 0,00</td></tr>
+              <tr><td>40 transferências cruzadas (A→B e B→A) ao mesmo tempo</td><td class="td-nao">24 erros 500 (deadlock)</td><td class="td-sim">40/40 aceitas, 0 erros (4 execuções)</td></tr>
+              <tr><td>Soma dos saldos após as transferências cruzadas</td><td>Correta (rollback)</td><td class="td-sim">Correta: nenhum centavo criado ou perdido</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-spotlight">
+          <div class="code-header"><span class="badge-tag green">CÓDIGO</span><span class="code-title">O critério de aprovação é financeiro</span><code class="code-file">tests/carga/double-spend.js</code><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>export const options = {
+  scenarios: { saques: { executor: 'shared-iterations', vus: 50, iterations: 50 } },
+  thresholds: {
+    saques_aceitos: ['count==10'],          // R$ 100 / R$ 10
+    saques_erro_inesperado: ['count==0'],   // nenhum 500
+  },
+};
+
+export function teardown(data) {
+  const saldo = http.get(`${BASE}/api/contacorrente/minha`, auth(data.token)).json('saldo');
+  check(saldo, { 'saldo final é zero': (s) =&gt; Number(s) === 0 });
+}</code></pre>
+        </div>
+
+        <div class="english-box">
+          <h4>🇺🇸 English for Developers</h4>
+          <div class="english-terms"><span><b>Load test</b> = teste de carga</span><span><b>Threshold</b> = limite de aprovação</span><span><b>Invariant check</b> = verificação de invariante</span></div>
+          <p class="en">"Our load test doesn't only measure latency. It fails if a single cent is created or lost."</p>
+          <p class="pt">Nosso teste de carga não mede só latência. Ele falha se um único centavo for criado ou perdido.</p>
+        </div>
+      </section>
+
+      <!-- ===================== TUTORIAL ===================== -->
+      <section id="m-tutorial" class="section-card lesson-module">
+        <div class="module-header">
+          <div class="module-topline"><span class="module-number">TUTORIAL</span><span class="estilo-pill prova">🛠️ Mão na massa</span></div>
+          <h2>Rodando o BankMore e reproduzindo as provas</h2>
+          <p class="module-subtitle">Do clone ao teste de concorrência, passo a passo.</p>
+        </div>
+
+        <div class="tutorial-step">
+          <h3>1. Configurar os segredos (nunca no repositório)</h3>
+          <div class="code-spotlight"><div class="code-header"><span class="code-title">Terminal</span><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>cd banco
+cp .env.example .env
+# edite .env: POSTGRES_PASSWORD e JWT_SECRET_KEY (mínimo 32 caracteres)
+# gerar uma chave: openssl rand -base64 48</code></pre></div>
+        </div>
+
+        <div class="tutorial-step">
+          <h3>2. Subir PostgreSQL, Kafka, API e Web com Docker</h3>
+          <div class="code-spotlight"><div class="code-header"><span class="code-title">Terminal</span><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>docker compose up --build
+# API + Swagger: http://localhost:5000/swagger
+# Web (Blazor):  http://localhost:5001</code></pre></div>
+        </div>
+
+        <div class="tutorial-step">
+          <h3>3. (Alternativa) Rodar local com SQL Server</h3>
+          <div class="code-spotlight"><div class="code-header"><span class="code-title">Terminal</span><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>cd src/BankMore.Auth.Infrastructure
+dotnet ef database update --startup-project ../BankMore.Auth.Infrastructure   # aplica VinculaContaAoTitular
+cd ../BankMore.Auth.API
+dotnet run</code></pre></div>
+          <p class="pt">Em desenvolvimento a chave JWT vem do <code>appsettings.Development.json</code> (só para uso local). Para qualquer outro ambiente, use <code>dotnet user-secrets</code> ou variável de ambiente.</p>
+        </div>
+
+        <div class="tutorial-step">
+          <h3>4. Rodar os testes</h3>
+          <div class="code-spotlight"><div class="code-header"><span class="code-title">Terminal</span><button class="btn-copy">📋 Copiar</button></div>
+<pre><code>dotnet test BankMore.Auth.sln          # 47 testes de unidade
+k6 run tests/carga/double-spend.js     # prova de concorrência (API rodando)</code></pre></div>
+        </div>
+
+        <div class="tutorial-step">
+          <h3>✅ Checklist do aluno</h3>
+          <ul class="checklist">
+            <li><label><input type="checkbox" id="ck-1"><span>Expliquei com minhas palavras por que a transferência interna não vira saga.</span></label></li>
+            <li><label><input type="checkbox" id="ck-2"><span>Rodei o k6 e vi 10 saques aceitos e saldo final zero.</span></label></li>
+            <li><label><input type="checkbox" id="ck-3"><span>Comentei a ordenação de locks, rodei transferências cruzadas e encontrei o deadlock no log.</span></label></li>
+            <li><label><input type="checkbox" id="ck-4"><span>Testei reenvio com a mesma Idempotency-Key (200) e com outro valor (422).</span></label></li>
+            <li><label><input type="checkbox" id="ck-5"><span>Tentei sacar da conta de outra pessoa e recebi 403.</span></label></li>
+            <li><label><input type="checkbox" id="ck-6"><span>Respondi as perguntas de entrevista em voz alta, em português e em inglês.</span></label></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== LABORATÓRIO INTERATIVO ===================== -->
+      <section id="simuladores" class="section-card interactive-lab-section">
+        <div class="module-header">
+          <div class="module-number">LABORATÓRIO</div>
+          <h2>Laboratório interativo e simuladores</h2>
+          <p class="module-subtitle">Brinque com os conceitos antes de ir para o código. Tudo roda no seu navegador.</p>
+        </div>
+
+        <div class="simulator-card" id="sim-double-spend">
+          <div class="simulator-header">
+            <h3>💸 Simulador de double-spend</h3>
+            <p>Saldo inicial R$ 100,00. Dispare vários saques de R$ 10,00 ao mesmo tempo e compare as duas implementações.</p>
+          </div>
+          <div class="sim-controls">
+            <label>Saques simultâneos <input type="number" id="ds-qtd" min="2" max="50" value="20"></label>
+            <button class="btn btn-primary" id="ds-run">▶ Disparar saques</button>
+          </div>
+          <div class="sim-grid">
+            <div class="sim-panel">
+              <h4>❌ Antes: ler → checar → debitar</h4>
+              <div class="saldo-display" id="ds-saldo-antes">R$ 100,00</div>
+              <div id="ds-resumo-antes" class="pt">—</div>
+              <div class="sim-log" id="ds-log-antes" aria-live="polite"></div>
+            </div>
+            <div class="sim-panel">
+              <h4>✅ Depois: UPDATE … WHERE saldo ≥ valor</h4>
+              <div class="saldo-display" id="ds-saldo-depois">R$ 100,00</div>
+              <div id="ds-resumo-depois" class="pt">—</div>
+              <div class="sim-log" id="ds-log-depois" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="simulator-card" id="sim-idempotencia">
+          <div class="simulator-header">
+            <h3>🔑 Simulador de idempotência</h3>
+            <p>Envie uma transferência, simule um timeout e reenvie. Depois troque o valor mantendo a chave.</p>
+          </div>
+          <div class="sim-controls">
+            <label>Idempotency-Key <input type="text" id="idem-chave" value="pix-001" class="form-text" style="font:inherit;padding:.4rem .6rem;border-radius:10px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text)"></label>
+            <label>Valor (R$) <input type="number" id="idem-valor" value="100" min="1"></label>
+            <button class="btn btn-primary" id="idem-enviar">Enviar</button>
+            <button class="btn btn-ghost" id="idem-timeout">⏱️ Simular timeout + reenvio</button>
+            <span class="cb-metric">Saldo: <strong id="idem-saldo">R$ 1.000,00</strong></span>
+          </div>
+          <div class="sim-log" id="idem-log" aria-live="polite"></div>
+        </div>
+
+        <div class="simulator-card" id="sim-saga">
+          <div class="simulator-header">
+            <h3>🔄 Simulador da saga do PIX</h3>
+            <p>Escolha onde a falha acontece e veja a compensação (ou o pior caso: a compensação falhar).</p>
+          </div>
+          <div class="sim-controls">
+            <label>Cenário
+              <select id="saga-falha">
+                <option value="nenhuma">Tudo certo</option>
+                <option value="antifraude">Antifraude recusa</option>
+                <option value="spi">SPI fora do ar</option>
+                <option value="estorno">SPI fora + estorno falha</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" id="saga-run">▶ Enviar PIX de R$ 250</button>
+            <span>Estado: <span class="estado-saga" id="saga-estado">—</span></span>
+          </div>
+          <div class="saga-steps">
+            <div class="saga-step" id="saga-bloquear"><span class="icone">🔒</span>Bloquear saldo</div>
+            <div class="saga-step" id="saga-antifraude"><span class="icone">🕵️</span>Antifraude</div>
+            <div class="saga-step" id="saga-liquidar"><span class="icone">🏛️</span>Liquidar no SPI</div>
+            <div class="saga-step" id="saga-efetivar"><span class="icone">✅</span>Efetivar débito</div>
+          </div>
+          <div class="sim-log" id="saga-log" aria-live="polite"></div>
+        </div>
+
+        <div class="simulator-card" id="sim-circuit">
+          <div class="simulator-header">
+            <h3>⚡ Simulador de Circuit Breaker no SPI</h3>
+            <p>Marque "SPI fora do ar" e envie PIX até o circuito abrir. Depois desmarque e espere o meio-aberto (8 segundos).</p>
+          </div>
+          <div class="cb-status">
+            <span class="cb-light" id="cb-luz"></span>
+            <strong id="cb-estado">Fechado</strong>
+            <span class="cb-metric" id="cb-falhas">Falhas seguidas: 0/3</span>
+            <span class="cb-metric" id="cb-bloqueados">Chamadas evitadas: 0</span>
+            <span class="cb-metric" id="cb-pendentes">PIX pendentes: 0</span>
+          </div>
+          <div class="sim-controls">
+            <label><input type="checkbox" id="cb-spi-fora"> SPI fora do ar</label>
+            <button class="btn btn-primary" id="cb-enviar">Enviar PIX</button>
+            <button class="btn btn-ghost" id="cb-reset">Reiniciar</button>
+          </div>
+          <div class="sim-log" id="cb-log" aria-live="polite"></div>
+        </div>
+
+        <div class="simulator-card" id="quiz-section">
+          <div class="simulator-header">
+            <h3>🧠 Quiz de entrevista (sênior, bancos)</h3>
+            <p>Placar: <span class="quiz-score" id="quiz-score">0 de 0</span></p>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">1. Qual a forma correta de impedir dois saques simultâneos de deixarem o saldo negativo?</div>
+            <div class="quiz-options">
+              <button class="quiz-option">Ler o saldo com SELECT e só depois fazer o UPDATE</button>
+              <button class="quiz-option" data-correta="true">UPDATE condicional (WHERE saldo &gt;= valor) e checar as linhas afetadas</button>
+              <button class="quiz-option">Usar lock em memória (lock do C#) no controller</button>
+            </div>
+            <div class="quiz-feedback">Lock em memória não funciona com duas instâncias da API. A checagem precisa ser atômica no banco.</div>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">2. Transferência entre duas contas do mesmo banco. Saga ou transação local?</div>
+            <div class="quiz-options">
+              <button class="quiz-option" data-correta="true">Transação local ACID: as duas contas vivem no mesmo contexto</button>
+              <button class="quiz-option">Saga com compensação, porque microsserviços são mais escaláveis</button>
+              <button class="quiz-option">Two-phase commit entre dois microsserviços</button>
+            </div>
+            <div class="quiz-feedback">Saga troca atomicidade por disponibilidade. Só vale quando não existe transação que cubra os dois lados (ex.: PIX externo).</div>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">3. O cliente reenviou a mesma transferência com a mesma Idempotency-Key e o mesmo valor. A API deve...</div>
+            <div class="quiz-options">
+              <button class="quiz-option">Responder 409 Conflict</button>
+              <button class="quiz-option">Processar de novo, porque pode ser uma nova intenção</button>
+              <button class="quiz-option" data-correta="true">Responder 200 com o mesmo id da primeira, sem mover dinheiro</button>
+            </div>
+            <div class="quiz-feedback">Replay devolve o resultado original. Conflito (422) só quando a mesma chave chega com outro conteúdo.</div>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">4. Qual microsserviço extrair primeiro de um monólito bancário?</div>
+            <div class="quiz-options">
+              <button class="quiz-option">O de contas, porque é o mais importante</button>
+              <button class="quiz-option" data-correta="true">O menos acoplado (ex.: Identity), para testar a esteira com baixo risco</button>
+              <button class="quiz-option">Todos de uma vez, num big bang bem planejado</button>
+            </div>
+            <div class="quiz-feedback">Comece pelo que tem fronteira clara e não move dinheiro. O núcleo financeiro é o último a ser tocado, se for.</div>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">5. A transferência commitou mas o servidor caiu antes de publicar no Kafka. Qual padrão evita a perda do evento?</div>
+            <div class="quiz-options">
+              <button class="quiz-option">Publicar no Kafka antes do commit</button>
+              <button class="quiz-option" data-correta="true">Outbox: gravar o evento na mesma transação e publicar depois</button>
+              <button class="quiz-option">Aumentar o timeout do Kafka</button>
+            </div>
+            <div class="quiz-feedback">Publicar antes do commit pode gerar evento de transação que deu rollback. O Outbox resolve o "dual write".</div>
+          </div>
+
+          <div class="quiz-item">
+            <div class="quiz-q">6. Transferências A→B e B→A simultâneas geram deadlock. Qual a correção que remove a causa?</div>
+            <div class="quiz-options">
+              <button class="quiz-option">Aumentar o número de retries</button>
+              <button class="quiz-option">Trocar para isolamento SERIALIZABLE</button>
+              <button class="quiz-option" data-correta="true">Travar as contas sempre na mesma ordem (ex.: Id crescente)</button>
+            </div>
+            <div class="quiz-feedback">Retry esconde o sintoma e SERIALIZABLE gera mais conflitos. Ordem fixa de lock impede o ciclo de espera.</div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        Escola BankMore · laboratório educacional, não movimenta dinheiro real · .NET 10 · PostgreSQL · Kafka ·
+        decisões registradas em <code>docs/adr</code> · modelo didático inspirado no microservico-senior.
+      </footer>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
